@@ -1,14 +1,44 @@
-import React from "react";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
-
-import Registergirl from '../assets/registergirl.jpg'
+import Registergirl from '../assets/registergirl.jpg';
 import { FcGoogle } from "react-icons/fc";
 import { FaApple } from "react-icons/fa";
-
+import { useAuth } from "../context/AuthContext";
 
 const UserRegister = () => {
+  const navigate = useNavigate();
+  const { register } = useAuth();
 
-  
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleRegister = async (e) => {
+    if (e) e.preventDefault();
+    if (!name || !email || !password) {
+      setError("Please fill in all fields.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      await register(name, email, password);
+      navigate("/login");
+    } catch (err) {
+      setError(err.message || "Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F3CAB6] flex items-center justify-center px-4 py-10">
 
@@ -68,7 +98,13 @@ const UserRegister = () => {
             </div>
 
             {/* Form */}
-            <div className="space-y-5">
+            <form onSubmit={handleRegister} className="space-y-5">
+
+              {error && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2.5 rounded-xl">
+                  {error}
+                </div>
+              )}
 
               {/* Name */}
               <div>
@@ -78,6 +114,8 @@ const UserRegister = () => {
 
                 <input
                   type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="Enter your name"
                   className="w-full px-4 py-3.5 rounded-xl border border-[#EFCAAD] bg-[#FFF9F6] outline-none focus:border-[#DC926E] focus:ring-2 focus:ring-[#F3CAB6] transition"
                 />
@@ -91,6 +129,8 @@ const UserRegister = () => {
 
                 <input
                   type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
                   className="w-full px-4 py-3.5 rounded-xl border border-[#EFCAAD] bg-[#FFF9F6] outline-none focus:border-[#DC926E] focus:ring-2 focus:ring-[#F3CAB6] transition"
                 />
@@ -104,6 +144,8 @@ const UserRegister = () => {
 
                 <input
                   type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="Create a password"
                   className="w-full px-4 py-3.5 rounded-xl border border-[#EFCAAD] bg-[#FFF9F6] outline-none focus:border-[#DC926E] focus:ring-2 focus:ring-[#F3CAB6] transition"
                 />
@@ -111,13 +153,14 @@ const UserRegister = () => {
 
               {/* Sign Up Button */}
               <button
-                type="button"
-                className="w-full bg-[#DC926E] hover:bg-[#c97e59] text-white font-semibold py-3.5 rounded-xl transition duration-300 shadow-md hover:shadow-lg"
+                type="submit"
+                disabled={loading}
+                className="w-full bg-[#DC926E] hover:bg-[#c97e59] text-white font-semibold py-3.5 rounded-xl transition duration-300 shadow-md hover:shadow-lg cursor-pointer disabled:opacity-75"
               >
-                Register →
+                {loading ? "Registering..." : "Register →"}
               </button>
 
-            </div>
+            </form>
 
             {/* Divider */}
             <div className="flex items-center gap-4 my-7">
@@ -135,7 +178,8 @@ const UserRegister = () => {
 
               <button
                 type="button"
-                className="w-full border border-[#EFCAAD] bg-white hover:bg-[#FFF5F0] py-3 rounded-xl flex items-center justify-center gap-3 text-[#46352F] font-medium transition"
+                onClick={() => navigate("/home")}
+                className="w-full border border-[#EFCAAD] bg-white hover:bg-[#FFF5F0] py-3 rounded-xl flex items-center justify-center gap-3 text-[#46352F] font-medium transition cursor-pointer"
               >
                 <span className="font-bold text-lg"><FcGoogle />
 </span>
@@ -144,7 +188,8 @@ const UserRegister = () => {
 
               <button
                 type="button"
-                className="w-full border border-[#EFCAAD] bg-white hover:bg-[#FFF5F0] py-3 rounded-xl flex items-center justify-center gap-3 text-[#46352F] font-medium transition"
+                onClick={() => navigate("/home")}
+                className="w-full border border-[#EFCAAD] bg-white hover:bg-[#FFF5F0] py-3 rounded-xl flex items-center justify-center gap-3 text-[#46352F] font-medium transition cursor-pointer"
               >
                 <span className="font-bold text-lg"><FaApple /></span>
                 Continue with Apple
@@ -155,12 +200,12 @@ const UserRegister = () => {
             {/* Login */}
             <p className="text-center text-sm text-gray-500 mt-7">
               Already have an account?
-              <a
-                href="#"
+              <Link
+                to="/login"
                 className="ml-1 text-[#DC926E] font-semibold hover:underline"
               >
                 Login
-              </a>
+              </Link>
             </p>
 
 

@@ -1,29 +1,44 @@
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/Login";
 import UserRegister from "./pages/UserRegister";
 import Home from "./pages/Home";
+import SkinAnalysis from "./pages/SkinAnalysis";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
+import { AuthProvider } from "./context/AuthContext";
+
+// Main layout with Header and Footer
+const MainLayout = ({ children }) => {
+  return (
+    <div className="min-h-screen bg-[#FAF8F5] text-[#2B2623] font-sans flex flex-col justify-between selection:bg-[#DC926E]/20 selection:text-[#DC926E]">
+      <Header />
+      <main className="flex-grow pt-20">
+        {children}
+      </main>
+      <Footer />
+    </div>
+  );
+};
 
 const App = () => {
   return (
-    <>
+    <AuthProvider>
       <BrowserRouter>
         <Routes>
-            <Route path="/" element={<Login />} />
-           <Route path="/register" element={<UserRegister />} />
-            <Route path="/home" element={<Home />} />
+          <Route path="/" element={<MainLayout><Home /></MainLayout>} />
+          <Route path="/home" element={<MainLayout><Home /></MainLayout>} />
+          <Route path="/analysis" element={<MainLayout><SkinAnalysis /></MainLayout>} />
+          <Route path="/skin-analysis" element={<MainLayout><SkinAnalysis /></MainLayout>} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<UserRegister />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
-      {/* <Header />
-      <main className="pt-16">
-        <Home />
-      </main>
-      <Footer /> */}
-    </>
+    </AuthProvider>
   );
 };
 
 export default App;
+

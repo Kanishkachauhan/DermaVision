@@ -1,11 +1,36 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-
 import girlImage from "../assets/registergirl.jpg";
+import { useAuth } from "../context/AuthContext";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleLogin = async (e) => {
+    if (e) e.preventDefault();
+    if (!email || !password) {
+      setError("Please fill in both email and password.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await login(email, password);
+      navigate("/home");
+    } catch (err) {
+      setError(err.message || "Failed to login. Please check credentials.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F3CAB6] flex items-center justify-center p-4">
 
@@ -80,7 +105,13 @@ const Login = () => {
             </div>
 
             {/* Form */}
-            <div className="space-y-6">
+            <form onSubmit={handleLogin} className="space-y-6">
+
+              {error && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2.5 rounded-xl">
+                  {error}
+                </div>
+              )}
 
               {/* Email */}
               <div>
@@ -90,6 +121,8 @@ const Login = () => {
 
                 <input
                   type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
                   className="w-full px-4 py-4 rounded-xl
                   border border-[#EFCAAD]
@@ -112,6 +145,8 @@ const Login = () => {
 
                 <input
                   type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   className="w-full px-4 py-4 rounded-xl
                   border border-[#EFCAAD]
@@ -138,8 +173,8 @@ const Login = () => {
 
               {/* Login Button */}
               <button
-                type="button"
-                onClick={() => navigate("/home")}
+                type="submit"
+                disabled={loading}
                 className="w-full bg-[#DC926E]
                 hover:bg-[#C97D58]
                 text-white
@@ -150,12 +185,13 @@ const Login = () => {
                 hover:shadow-lg
                 transition-all
                 duration-300
-                hover:-translate-y-0.5"
+                hover:-translate-y-0.5
+                cursor-pointer disabled:opacity-75"
               >
-                Login →
+                {loading ? "Logging in..." : "Login →"}
               </button>
 
-            </div>
+            </form>
 
             {/* Register Option */}
             <div className="text-center mt-8">

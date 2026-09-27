@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['melasma']
+
+roboflow:
+  workspace: umm-alqura-ac9k1
+  project: pigmentation-ijdal
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/umm-alqura-ac9k1/pigmentation-ijdal/dataset/1

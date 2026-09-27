@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 5
+names: ['-', 'This dataset was exported via roboflow.com on October 25- 2023 at 12-25 PM GMT', 'skin redness - v4 2023-10-25 5-23am', 'skinredness', 'vascular']
+
+roboflow:
+  workspace: shehneel-khan
+  project: redness-b7tdg
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/shehneel-khan/redness-b7tdg/dataset/1
