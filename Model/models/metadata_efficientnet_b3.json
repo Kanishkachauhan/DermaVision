@@ -1,0 +1,24 @@
+{
+  "variant": "B3",
+  "architecture": "EfficientNet-B3 Multi-Task",
+  "checkpoint": "efficientnet_acne_b3.pth",
+  "total_samples": 342,
+  "target_size": 300,
+  "epochs": 4,
+  "best_loss": 5.3315,
+  "final_mae": 12.74,
+  "classes": {
+    "severity": [
+      "Low",
+      "Medium",
+      "High"
+    ],
+    "subtypes": [
+      "Non-Inflammatory (Comedonal)",
+      "Mixed (Comedonal + Mild Inflammatory)",
+      "Inflammatory (Papulopustular)",
+      "Vascular Erythema / Rosacea"
+    ]
+  },
+  "updated_at": "2026-09-29 14:15:33"
+}

@@ -1,2 +1,23 @@
 .env
 node_modules/
+
+# Large third-party source repos
+Model/models/mediapipe-master/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Model weight files (use Git LFS or cloud storage instead)
+*.h5
+*.pt
+*.pth
+*.onnx
+*.tflite
+
+# macOS
+.DS_Store

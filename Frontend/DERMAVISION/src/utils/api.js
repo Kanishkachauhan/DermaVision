@@ -24,7 +24,6 @@ export async function apiRequest(endpoint, options = {}) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      // Backend returns { message: '...' } or express-validator { errors: [...] }
       const errorMsg =
         data.message ||
         (Array.isArray(data.errors) && data.errors[0]?.msg) ||
@@ -47,4 +46,26 @@ export async function apiRequest(endpoint, options = {}) {
     }
     throw err;
   }
+}
+
+/**
+ * Send dark circle analysis to backend → forwarded to Python AI service
+ * @param {object} payload - { leftEyeCrop, rightEyeCrop, darkCirclesPercentage, metrics, regions }
+ */
+export async function analyzeDarkCirclesApi(payload) {
+  return apiRequest('/analysis/dark-circles', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Send acne & pore analysis to backend → forwarded to EfficientNet-B0/B3 AI service
+ * @param {object} payload - { image?, imageFull?, crops?, acneScore, poreScore, zoneAcne, ... }
+ */
+export async function analyzeAcneApi(payload) {
+  return apiRequest('/analysis/acne', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
