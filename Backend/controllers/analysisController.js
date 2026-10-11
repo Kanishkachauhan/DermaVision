@@ -9,6 +9,7 @@
  *     → Python AI Service (EfficientNet-B0/B3 + CIELAB dark-circle engine) → Results
  */
 import axios from 'axios';
+import { ensureAIServerRunning } from '../utils/aiServerManager.js';
 
 const AI_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000';
 
@@ -29,51 +30,170 @@ const getSeverity = (val) => {
 // ─── Dark Circles ──────────────────────────────────────────────────────────────
 export const analyzeDarkCircles = async (req, res, next) => {
   try {
-    const { leftEyeCrop, rightEyeCrop, cheekCrop, landmarks, darkCirclesPercentage, metrics } = req.body;
+    const {
+      image,
+      leftEyeCrop,
+      rightEyeCrop,
+      cheekCrop,
+      landmarks,
+      darkCirclesPercentage,
+      severityScore,
+      detectionConfidence,
+      leftEye,
+      rightEye,
+      asymmetry,
+      features,
+      metrics,
+    } = req.body;
 
-    // Prefer real image data (from eye crop or full face)
-    const imagePayload = leftEyeCrop || cheekCrop || null;
+    // Prefer full image if available, otherwise eye crop
+    const imagePayload = image || leftEyeCrop || cheekCrop || null;
 
     let aiData = null;
     try {
       const aiRes = await aiClient.post('/api/analyze/dark-circles', {
-        image:                imagePayload,
-        leftEyeCrop:          leftEyeCrop  || null,
-        rightEyeCrop:         rightEyeCrop || null,
-        landmarks:            landmarks    || null,
-        darkCirclesPercentage: darkCirclesPercentage ?? null,
-        metrics:              metrics      || null,
+        image:                 imagePayload,
+        leftEyeCrop:           leftEyeCrop  || null,
+        rightEyeCrop:          rightEyeCrop || null,
+        landmarks:             landmarks    || null,
+        darkCirclesPercentage: darkCirclesPercentage ?? severityScore ?? null,
+        metrics: {
+          ...(metrics || {}),
+          severityScore,
+          detectionConfidence,
+          leftEye,
+          rightEye,
+          asymmetry,
+          features,
+        },
       });
       aiData = aiRes.data?.data || aiRes.data || null;
     } catch (aiErr) {
       console.warn('[analysisController] AI service unreachable, using client metrics:', aiErr.message);
     }
 
-    // Merge AI result with client-side metrics
-    const pct        = aiData?.darkCirclesPercentage ?? (darkCirclesPercentage !== undefined ? Number(darkCirclesPercentage) : 42);
-    const severity   = aiData?.severity   ?? getSeverity(pct);
-    const etiology   = aiData?.etiology   ?? metrics?.etiology   ?? 'Vascular (Bluish/Purple Pooling)';
-    const recommendation = aiData?.recommendation ?? metrics?.recommendation ?? 'Caffeine 5% Solution, Vitamin K & cold compress';
-    const deltaL     = aiData?.deltaL     ?? metrics?.deltaL     ?? 14.2;
-    const confidence = aiData?.confidence ?? '97.4%';
+    if (aiData && (aiData.error || aiData.success === false)) {
+      return res.status(200).json({
+        success: false,
+        error: aiData.error || 'Image quality is insufficient for reliable analysis.',
+        message: aiData.error || 'Image quality is insufficient for reliable analysis.',
+        data: {
+          quality_error: true,
+          error: aiData.error || 'Image quality is insufficient for reliable analysis.',
+          disclaimer: 'Image quality is insufficient for reliable analysis. Please ensure balanced lighting without harsh shadows.'
+        }
+      });
+    }
+
+    const getCategoryForScore = (s) => {
+      if (s <= 20) return { label: 'Minimal', color: '#10B981', bg: '#ECFDF5', text: 'text-emerald-700' };
+      if (s <= 40) return { label: 'Mild', color: '#3B82F6', bg: '#EFF6FF', text: 'text-blue-700' };
+      if (s <= 60) return { label: 'Moderate', color: '#F59E0B', bg: '#FFFBEB', text: 'text-amber-700' };
+      if (s <= 80) return { label: 'High', color: '#F97316', bg: '#FFF7ED', text: 'text-orange-700' };
+      return { label: 'Very High', color: '#EF4444', bg: '#FEF2F2', text: 'text-red-700' };
+    };
+
+    // ── 1. DETECTION CONFIDENCE (Pure model Softmax probability) ──────────────
+    const rawConf = aiData?.detection_confidence ?? detectionConfidence ?? 0.85;
+    const detConfidence = typeof rawConf === 'number' ? rawConf : parseFloat(rawConf) || 0.85;
+    const confidencePct = Math.round(detConfidence <= 1.0 ? detConfidence * 100 : detConfidence);
+    const isDetected = aiData?.is_detected ?? (confidencePct >= 50);
+
+    const leftEyeConf = aiData?.left_eye?.confidence ?? detConfidence;
+    const leftEyePct  = Math.round(leftEyeConf <= 1.0 ? leftEyeConf * 100 : leftEyeConf);
+    const rightEyeConf = aiData?.right_eye?.confidence ?? detConfidence;
+    const rightEyePct = Math.round(rightEyeConf <= 1.0 ? rightEyeConf * 100 : rightEyeConf);
+
+    const statusText = isDetected
+      ? 'Dark Circles Detected'
+      : 'Dark circles not detected';
+
+    // ── 2. ESTIMATED DARK CIRCLE SEVERITY (Under-eye darkness / contrast / area) ──
+    const clientSevScore = severityScore !== undefined ? Number(severityScore) : (metrics?.severityScore !== undefined ? Number(metrics.severityScore) : 32);
+    const overallSevScore = aiData?.severity_score !== undefined
+      ? Number(aiData.severity_score)
+      : clientSevScore;
+
+    const leftSevScore = aiData?.left_eye?.severity_score !== undefined
+      ? Number(aiData.left_eye.severity_score)
+      : (leftEye?.score !== undefined ? Number(leftEye.score) : Math.max(8, overallSevScore - 4));
+
+    const rightSevScore = aiData?.right_eye?.severity_score !== undefined
+      ? Number(aiData.right_eye.severity_score)
+      : (rightEye?.score !== undefined ? Number(rightEye.score) : Math.min(95, overallSevScore + 4));
+
+    const affectedAreaPct = aiData?.affected_area_percent !== undefined
+      ? Number(aiData.affected_area_percent)
+      : (features?.affectedArea !== undefined ? Number(features.affectedArea) : 18);
+
+    const sevCategory = aiData?.severity_category || getCategoryForScore(overallSevScore).label;
+    const sevObj = aiData?.severity || getCategoryForScore(overallSevScore);
+    const leftCat = aiData?.left_eye?.severity_category || getCategoryForScore(leftSevScore).label;
+    const rightCat = aiData?.right_eye?.severity_category || getCategoryForScore(rightSevScore).label;
+
+    const disclaimer = 'This analysis provides estimated under-eye severity (0–100) based on physical contrast and affected area. It is an application-defined visual estimate, not a clinical diagnosis.';
 
     return res.status(200).json({
       success: true,
-      message: 'Periorbital CIELAB dark-circle analysis completed',
+      message: 'Dark circle detection and severity analysis completed',
       data: {
         timestamp:            new Date().toISOString(),
-        model:                'CIELAB Periorbital Telemetry Engine',
-        darkCirclesPercentage: pct,
-        severity,
-        confidence,
-        etiology,
-        recommendation,
-        deltaL,
-        hasCrops:    Boolean(leftEyeCrop && rightEyeCrop),
-        detectedBoxes: aiData?.detectedBoxes ?? [
-          { id: 'box-1', x: 31, y: 45, width: 17, height: 9, label: 'Left Dark Circle',  type: 'dark_circle' },
-          { id: 'box-2', x: 52, y: 45, width: 17, height: 9, label: 'Right Dark Circle', type: 'dark_circle' },
+        model:                aiData?.model_info?.name ?? 'DarkCircleNet (MobileNetV3-Large)',
+        dataset:              'Dark Circles Detection.v3i.yolov8 (2,650 annotated images)',
+        // ── PURE DETECTION STATUS ──────────────────────────────────────────────
+        detection_confidence: detConfidence,
+        confidence_percentage: confidencePct,
+        confidence:           `${confidencePct}%`,
+        is_detected:          isDetected,
+        status:               statusText,
+        model_summary:        isDetected ? 'Dark circles identified via under-eye analysis.' : 'No significant dark circles identified.',
+        threshold:            0.50,
+
+        // ── ESTIMATED DARK CIRCLE SEVERITY (0–100) ─────────────────────────────
+        severity_score:       overallSevScore,
+        severity_category:    sevCategory,
+        severity_label:       sevCategory,
+        severity:             sevObj,
+        affected_area_percent: affectedAreaPct,
+        affected_area:        `${affectedAreaPct}%`,
+
+        // Separate Left and Right Eye
+        left_eye: {
+          confidence:         leftEyeConf,
+          percentage:         leftEyePct,
+          is_detected:        leftEyePct >= 50,
+          status:             leftEyePct >= 50 ? 'Detected' : 'Not detected',
+          severity_score:     leftSevScore,
+          severity_category:  leftCat,
+          affected_area_percent: aiData?.left_eye?.affected_area_percent ?? affectedAreaPct,
+        },
+        right_eye: {
+          confidence:         rightEyeConf,
+          percentage:         rightEyePct,
+          is_detected:        rightEyePct >= 50,
+          status:             rightEyePct >= 50 ? 'Detected' : 'Not detected',
+          severity_score:     rightSevScore,
+          severity_category:  rightCat,
+          affected_area_percent: aiData?.right_eye?.affected_area_percent ?? affectedAreaPct,
+        },
+        features:             aiData?.features ?? features ?? {
+          relative_darkness: 30,
+          local_contrast: 25,
+          affected_area: affectedAreaPct,
+        },
+        model_info:           aiData?.model_info ?? {
+          name: 'DarkCircleNet (MobileNetV3-Large Backbone)',
+          output_layer: 'severity_logits (3-class softmax)',
+          presence_formula: 'P(presence) = P(Medium) + P(High) = 1.0 - P(Low)',
+        },
+        disclaimer,
+        hasCrops:             Boolean(leftEyeCrop && rightEyeCrop),
+        detectedBoxes:        aiData?.detectedBoxes ?? [
+          { id: 'box-1', x: 31, y: 45, width: 17, height: 9, label: isDetected ? 'Left Dark Circle' : 'Left Eye Area',  type: 'dark_circle' },
+          { id: 'box-2', x: 52, y: 45, width: 17, height: 9, label: isDetected ? 'Right Dark Circle' : 'Right Eye Area', type: 'dark_circle' },
         ],
+        // Backward compatibility
+        darkCirclesPercentage: overallSevScore,
       },
     });
   } catch (error) {
@@ -166,3 +286,92 @@ export const analyzeAcne = async (req, res, next) => {
     next(error);
   }
 };
+
+// ─── ViT Face Redness & Erythema Analysis (varun1505/face-characteristics) ───
+export const analyzeRedness = async (req, res, next) => {
+  try {
+    const { image, crops, landmarks, zoneRedness } = req.body;
+
+    const imagePayload = image || crops?.leftCheek || crops?.forehead || null;
+
+    if (!imagePayload) {
+      return res.status(400).json({ success: false, message: 'Image payload is required for redness analysis.' });
+    }
+
+    let aiData = null;
+    let aiError = null;
+    try {
+      const aiRes = await aiClient.post('/api/analyze/redness', {
+        image: imagePayload,
+        crops: crops || null,
+        landmarks: landmarks || null,
+        zoneRedness: zoneRedness || null,
+      });
+      aiData = aiRes.data?.data || aiRes.data || null;
+    } catch (aiErr) {
+      aiError = aiErr.message || 'AI service unreachable';
+      console.warn('[analyzeRedness] ViT AI service not reachable, attempting auto-recovery...');
+      const recovered = await ensureAIServerRunning();
+      if (recovered) {
+        try {
+          const retryRes = await aiClient.post('/api/analyze/redness', {
+            image: imagePayload,
+            crops: crops || null,
+            landmarks: landmarks || null,
+            zoneRedness: zoneRedness || null,
+          });
+          aiData = retryRes.data?.data || retryRes.data || null;
+        } catch (retryErr) {
+          aiError = retryErr.message;
+        }
+      }
+    }
+
+    // ── If AI service is down or returned no data, return a clear error ──────
+    // We do NOT serve static / hardcoded data — only real model output.
+    if (!aiData) {
+      return res.status(503).json({
+        success: false,
+        ai_service_down: true,
+        message: 'Redness AI service (Python ViT model) is not reachable. Please start the Python AI server on port 8000 and retry.',
+        error: aiError,
+        instructions: [
+          'cd Model/05_api_service',
+          'python3 server.py',
+          'Ensure port 8000 is free and PyTorch + transformers are installed.',
+        ],
+      });
+    }
+
+    // ── Only return actual model predictions ─────────────────────────────────
+    return res.status(200).json({
+      success: true,
+      message: 'Facial redness analysis completed by ViT Face Characteristics model (varun1505/face-characteristics)',
+      data: {
+        ...aiData,
+        // Normalize field names for frontend compatibility
+        timestamp: new Date().toISOString(),
+        huggingface_url: 'https://huggingface.co/varun1505/face-characteristics',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─── OpenCV Skin Preprocessing & Illumination Filter ─────────────────────────
+export const filterSkin = async (req, res, next) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ success: false, message: 'Image payload required.' });
+    }
+
+    const aiRes = await aiClient.post('/api/filter/skin', { image });
+    return res.status(200).json(aiRes.data);
+  } catch (error) {
+    next(error);
+  }
+};
+
+

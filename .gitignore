@@ -18,6 +18,8 @@ venv/
 *.pth
 *.onnx
 *.tflite
+*.safetensors
+*.bin
 
 # macOS
 .DS_Store

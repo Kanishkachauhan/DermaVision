@@ -40,36 +40,37 @@ const UserRegister = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F3CAB6] flex items-center justify-center px-4 py-10">
+    <div className="min-h-[100dvh] bg-[#F3CAB6] flex items-center justify-center p-3 sm:p-6 md:p-8">
 
-      <div className="w-full max-w-6xl min-h-162.5 bg-[#EFCAAD] rounded-3xl overflow-hidden shadow-2xl flex flex-col lg:flex-row">
+      <div className="w-full max-w-6xl bg-[#EFCAAD] rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col lg:flex-row my-auto">
 
         {/* Left Side - Image */}
         <div
-          className="relative lg:w-1/2 min-h-87.5 lg:min-h-full bg-cover bg-center"
+          className="relative lg:w-1/2 min-h-[200px] sm:min-h-[280px] lg:min-h-[640px] bg-cover bg-center"
           style={{
             backgroundImage: `url(${Registergirl})`,
           }}
         >
           {/* Overlay */}
-          <div className="absolute inset-0 bg-linear-to-t from-[#DC926E]/60 via-transparent to-transparent"></div>
+          <div className="absolute inset-0 bg-linear-to-t from-[#DC926E]/70 via-[#46352F]/20 to-transparent"></div>
 
           {/* Logo */}
-          <div className="absolute top-8 left-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-white">
+          <div className="absolute top-4 left-4 sm:top-8 sm:left-8">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
               DermaVision
             </h1>
           </div>
 
           {/* Bottom Text */}
-          <div className="absolute bottom-8 left-8 right-8 text-white">
-            <p className="text-3xl md:text-4xl font-semibold">
+          <div className="absolute bottom-4 left-4 right-4 sm:bottom-8 sm:left-8 sm:right-8 text-white">
+            <p className="text-2xl sm:text-3xl md:text-4xl font-semibold leading-tight">
               Your Skin,
-              <br />
+              <span className="sm:hidden"> </span>
+              <br className="hidden sm:inline" />
               Our Priority.
             </p>
 
-            <p className="mt-3 text-sm md:text-base max-w-sm">
+            <p className="hidden sm:block mt-2 sm:mt-3 text-xs sm:text-base max-w-sm text-white/90">
               Discover your skin better with intelligent analysis
               and personalized skincare recommendations.
             </p>
@@ -77,21 +78,21 @@ const UserRegister = () => {
         </div>
 
         {/* Right Side - Sign Up Card */}
-        <div className="lg:w-1/2 bg-white/90 backdrop-blur-sm flex items-center justify-center p-6 sm:p-10 md:p-14">
+        <div className="lg:w-1/2 bg-white/95 backdrop-blur-sm flex items-center justify-center p-5 sm:p-10 md:p-14">
 
           <div className="w-full max-w-md">
 
             {/* Heading */}
-            <div className="text-center mb-8">
-              <p className="text-sm uppercase tracking-[0.25em] text-[#DC926E] font-semibold">
+            <div className="text-center mb-6 sm:mb-8">
+              <p className="text-xs sm:text-sm uppercase tracking-[0.2em] sm:tracking-[0.25em] text-[#DC926E] font-semibold">
                 Create Your Account
               </p>
 
-              <h2 className="text-4xl md:text-5xl font-bold text-[#46352F] mt-2">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#46352F] mt-1 sm:mt-2">
                 Sign Up
               </h2>
 
-              <p className="text-gray-500 mt-3">
+              <p className="text-gray-500 text-xs sm:text-sm mt-2 sm:mt-3">
                 Start your journey towards healthier,
                 glowing skin.
               </p>

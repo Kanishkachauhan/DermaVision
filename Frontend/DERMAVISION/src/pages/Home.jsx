@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  HiChevronDown, 
+import {
+  HiChevronDown,
   HiArrowRight,
-  HiOutlinePhotograph, 
-  HiOutlineSparkles, 
-  HiOutlineDocumentReport, 
+  HiOutlinePhotograph,
+  HiOutlineSparkles,
+  HiOutlineDocumentReport,
   HiOutlineShieldCheck,
   HiOutlineLocationMarker,
   HiOutlineCheckCircle,
@@ -210,59 +210,59 @@ const Home = () => {
   ];
 
   return (
-    <div id="home" className="space-y-20 sm:space-y-28 pb-20 overflow-hidden">
-      
-      {/* SECTION 1: HERO SECTION */}
-      <section className="relative max-w-7xl mx-auto px-6 md:px-12 pt-6 md:pt-14">
-        {/* Subtle geometric backdrop frame */}
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-[#F5D8C9]/30 rounded-lg blur-3xl -z-10 pointer-events-none" />
+    <div id="home" className="space-y-14 sm:space-y-20 md:space-y-28 pb-14 sm:pb-20 overflow-hidden w-full">
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          
+      {/* SECTION 1: HERO SECTION */}
+      <section className="relative max-w-7xl mx-auto px-4 sm:px-6 md:px-12 pt-4 sm:pt-8 md:pt-14">
+        {/* Subtle geometric backdrop frame */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] sm:w-[480px] md:w-[600px] h-[220px] sm:h-[350px] bg-[#F5D8C9]/30 rounded-lg blur-3xl -z-10 pointer-events-none" />
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+
           {/* Hero Content */}
-          <div className="lg:col-span-7 space-y-7 text-left">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md bg-[#F5EBE6] border border-[#EACFC2] text-xs font-semibold text-[#C46D46] tracking-wide">
-              <HiOutlineSparkles className="text-sm" />
-              <span>AI-POWERED SKIN ANALYSIS & DECISION SUPPORT</span>
+          <div className="lg:col-span-7 space-y-5 sm:space-y-7 text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#F5EBE6] border border-[#EACFC2] text-[11px] sm:text-xs font-semibold text-[#C46D46] tracking-wide">
+              <HiOutlineSparkles className="text-sm shrink-0" />
+              <span>AI-POWERED SKIN ANALYSIS &amp; DECISION SUPPORT</span>
             </div>
 
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-[#2B2623] tracking-tight leading-[1.15]">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-[#2B2623] tracking-tight leading-[1.18]">
               DermaVision <br />
-              <span className="text-[#DC926E] font-normal">AI Skin Analysis & Recommendation System</span>
+              <span className="text-[#DC926E] font-normal">AI Skin Analysis &amp; Recommendation System</span>
             </h1>
 
-            <p className="text-sm sm:text-base text-[#6B615B] leading-relaxed max-w-2xl font-light">
+            <p className="text-xs sm:text-sm md:text-base text-[#6B615B] leading-relaxed max-w-2xl font-light">
               An intelligent platform leveraging Deep Learning and Computer Vision to analyze facial skin images, identify concerns like acne, pores, pigmentation, and dark spots, compute confidence scores, generate downloadable health reports, and connect you with nearby dermatologists.
             </p>
 
             {/* Quick Feature Badges */}
-            <div className="flex flex-wrap gap-2 pt-1 text-xs">
-              <span className="px-3 py-1.5 rounded-md bg-white border border-[#E8DFD8] text-[#5A524C] font-semibold">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-1 text-[11px] sm:text-xs">
+              <span className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md bg-white border border-[#E8DFD8] text-[#5A524C] font-semibold">
                 ✓ Deep Learning Detection
               </span>
-              <span className="px-3 py-1.5 rounded-md bg-white border border-[#E8DFD8] text-[#5A524C] font-semibold">
+              <span className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md bg-white border border-[#E8DFD8] text-[#5A524C] font-semibold">
                 ✓ AI Confidence Scoring
               </span>
-              <span className="px-3 py-1.5 rounded-md bg-white border border-[#E8DFD8] text-[#5A524C] font-semibold">
+              <span className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md bg-white border border-[#E8DFD8] text-[#5A524C] font-semibold">
                 ✓ Downloadable PDF Reports
               </span>
-              <span className="px-3 py-1.5 rounded-md bg-white border border-[#E8DFD8] text-[#5A524C] font-semibold">
+              <span className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md bg-white border border-[#E8DFD8] text-[#5A524C] font-semibold">
                 ✓ Nearby Dermatologist Locator
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 pt-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-2">
               <Link
                 to="/analysis"
-                className="bg-[#DC926E] hover:bg-[#c87e5b] text-white font-semibold px-7 py-3.5 rounded-md shadow-sm transition-all duration-200 flex items-center gap-2 text-sm"
+                className="w-full sm:w-auto bg-[#DC926E] hover:bg-[#c87e5b] text-white font-semibold px-6 sm:px-7 py-3 sm:py-3.5 rounded-md shadow-sm transition-all duration-200 flex items-center justify-center gap-2 text-xs sm:text-sm"
               >
                 <span>Start AI Skin Analysis</span>
                 <HiArrowRight />
               </Link>
 
               <a
-                href="#clinic-finder"
-                className="bg-[#F5EBE6] hover:bg-[#EAE0DA] text-[#4A423D] font-semibold px-6 py-3.5 rounded-md transition-all duration-200 border border-[#E5D7CE] text-sm flex items-center gap-2"
+                href="#dermatologists"
+                className="w-full sm:w-auto bg-[#F5EBE6] hover:bg-[#EAE0DA] text-[#4A423D] font-semibold px-5 sm:px-6 py-3 sm:py-3.5 rounded-md transition-all duration-200 border border-[#E5D7CE] text-xs sm:text-sm flex items-center justify-center gap-2"
               >
                 <HiOutlineLocationMarker className="text-base text-[#DC926E]" />
                 <span>Find Nearby Clinics</span>
@@ -272,31 +272,31 @@ const Home = () => {
           </div>
 
           {/* Hero Visual Card */}
-          <div className="lg:col-span-5 relative">
-            <div className="relative rounded-md overflow-hidden shadow-xl border border-[#E8DFD8] bg-[#FAF8F5] p-3">
-              <div className="relative rounded-sm overflow-hidden group">
-                <img 
-                  src={scanUiImg} 
-                  alt="DermaVision AI Facial Analysis" 
-                  className="w-full h-[420px] object-cover object-center transform transition-transform duration-700 group-hover:scale-105"
+          <div className="lg:col-span-5 relative mt-4 lg:mt-0">
+            <div className="relative rounded-xl overflow-hidden shadow-xl border border-[#E8DFD8] bg-[#FAF8F5] p-2.5 sm:p-3">
+              <div className="relative rounded-lg overflow-hidden group">
+                <img
+                  src={scanUiImg}
+                  alt="DermaVision AI Facial Analysis"
+                  className="w-full h-64 sm:h-80 md:h-96 lg:h-[420px] object-cover object-center transform transition-transform duration-700 group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+
                 {/* Floating AI Confidence Badge */}
-                <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-md border border-white/40 shadow-sm flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                  <span className="text-xs font-bold text-[#2B2623]">AI Confidence Score: 97.4%</span>
+                <div className="absolute top-3 left-3 sm:top-4 sm:left-4 bg-white/95 backdrop-blur-md px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-md border border-white/40 shadow-sm flex items-center gap-2">
+                  <span className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                  <span className="text-[11px] sm:text-xs font-bold text-[#2B2623]">AI Confidence Score: 97.4%</span>
                 </div>
 
-                <div className="absolute bottom-4 left-4 right-4 bg-[#2B2623]/95 backdrop-blur-md p-4 rounded-md text-white border border-white/10 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-[#D8CFCA]">
-                    <span>Detected: Acne, Blackheads & Pores</span>
+                <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 bg-[#2B2623]/95 backdrop-blur-md p-3 sm:p-4 rounded-md text-white border border-white/10 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] sm:text-xs text-[#D8CFCA]">
+                    <span>Detected: Acne, Blackheads &amp; Pores</span>
                     <span className="text-[#DC926E] font-bold">Skin Type: Combination</span>
                   </div>
                   <div className="w-full bg-[#48413E] h-1.5 rounded-sm overflow-hidden">
                     <div className="bg-[#DC926E] h-full rounded-sm w-[97%]" />
                   </div>
-                  <div className="flex justify-between items-center pt-1 text-[11px] text-[#A89F99]">
+                  <div className="flex justify-between items-center pt-1 text-[10px] sm:text-[11px] text-[#A89F99]">
                     <span>Decision Support Report Ready</span>
                     <span className="text-emerald-400 font-medium">Download PDF</span>
                   </div>
@@ -309,13 +309,13 @@ const Home = () => {
       </section>
 
       {/* SECTION 2: CONTINUOUS PICTURE MARQUEE SHOWCASE */}
-      <section className="space-y-6">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 text-center space-y-2">
+      <section className="space-y-4 sm:space-y-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 text-center space-y-2">
           <span className="text-xs font-bold uppercase tracking-widest text-[#DC926E]">
             Visual AI Showcase
           </span>
-          <h2 className="text-2xl sm:text-3xl font-bold text-[#2B2623]">
-            Computer Vision Analysis & Diagnostics
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#2B2623]">
+            Computer Vision Analysis &amp; Diagnostics
           </h2>
           <p className="text-xs sm:text-sm text-[#7A7069] max-w-xl mx-auto font-light">
             Continuous visual showcase of facial landmark telemetry, sub-surface pore mapping, clinical consultation, and downloadable report analytics.
@@ -323,26 +323,26 @@ const Home = () => {
         </div>
 
         {/* Marquee Row 1 */}
-        <div className="relative w-full overflow-hidden py-4 bg-[#F5EBE6]/40 border-y border-[#E8DFD8]">
-          <div className="animate-marquee gap-6 px-3">
+        <div className="relative w-full overflow-hidden py-3 sm:py-4 bg-[#F5EBE6]/40 border-y border-[#E8DFD8]">
+          <div className="animate-marquee gap-4 sm:gap-6 px-3">
             {[...marqueeItems, ...marqueeItems].map((item, idx) => (
               <div
                 key={`m1-${idx}`}
-                className="w-80 sm:w-96 flex-shrink-0 bg-white rounded-md overflow-hidden border border-[#E8DFD8] shadow-sm hover:shadow-md transition-all duration-300 group"
+                className="w-68 sm:w-80 md:w-96 flex-shrink-0 bg-white rounded-md overflow-hidden border border-[#E8DFD8] shadow-sm hover:shadow-md transition-all duration-300 group"
               >
-                <div className="relative h-52 overflow-hidden">
+                <div className="relative h-40 sm:h-48 md:h-52 overflow-hidden">
                   <img
                     src={item.img}
                     alt={item.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute top-3 right-3 bg-[#2B2623]/85 backdrop-blur-md text-white text-[11px] font-semibold px-3 py-1 rounded-sm">
+                  <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 bg-[#2B2623]/85 backdrop-blur-md text-white text-[10px] sm:text-[11px] font-semibold px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-sm">
                     {item.tag}
                   </div>
                 </div>
-                <div className="p-4 space-y-1 bg-white">
-                  <h4 className="font-bold text-sm text-[#2B2623]">{item.title}</h4>
-                  <p className="text-xs text-[#8C837E]">{item.subtitle}</p>
+                <div className="p-3 sm:p-4 space-y-1 bg-white">
+                  <h4 className="font-bold text-xs sm:text-sm text-[#2B2623]">{item.title}</h4>
+                  <p className="text-[11px] sm:text-xs text-[#8C837E]">{item.subtitle}</p>
                 </div>
               </div>
             ))}
@@ -350,26 +350,26 @@ const Home = () => {
         </div>
 
         {/* Marquee Row 2 */}
-        <div className="relative w-full overflow-hidden py-4">
-          <div className="animate-marquee-reverse gap-6 px-3">
+        <div className="relative w-full overflow-hidden py-3 sm:py-4">
+          <div className="animate-marquee-reverse gap-4 sm:gap-6 px-3">
             {[...marqueeItems, ...marqueeItems].reverse().map((item, idx) => (
               <div
                 key={`m2-${idx}`}
-                className="w-80 sm:w-96 flex-shrink-0 bg-[#FAF8F5] rounded-md overflow-hidden border border-[#E8DFD8] shadow-sm hover:shadow-md transition-all duration-300 group"
+                className="w-68 sm:w-80 md:w-96 flex-shrink-0 bg-[#FAF8F5] rounded-md overflow-hidden border border-[#E8DFD8] shadow-sm hover:shadow-md transition-all duration-300 group"
               >
-                <div className="relative h-52 overflow-hidden">
+                <div className="relative h-40 sm:h-48 md:h-52 overflow-hidden">
                   <img
                     src={item.img}
                     alt={item.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute top-3 left-3 bg-[#DC926E]/95 backdrop-blur-md text-white text-[11px] font-semibold px-3 py-1 rounded-sm">
+                  <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 bg-[#DC926E]/95 backdrop-blur-md text-white text-[10px] sm:text-[11px] font-semibold px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-sm">
                     {item.tag}
                   </div>
                 </div>
-                <div className="p-4 space-y-1 bg-white">
-                  <h4 className="font-bold text-sm text-[#2B2623]">{item.title}</h4>
-                  <p className="text-xs text-[#8C837E]">{item.subtitle}</p>
+                <div className="p-3 sm:p-4 space-y-1 bg-white">
+                  <h4 className="font-bold text-xs sm:text-sm text-[#2B2623]">{item.title}</h4>
+                  <p className="text-[11px] sm:text-xs text-[#8C837E]">{item.subtitle}</p>
                 </div>
               </div>
             ))}
@@ -378,73 +378,73 @@ const Home = () => {
       </section>
 
       {/* SECTION 3: 9-POINT SKIN CONCERN DETECTION CAPABILITIES */}
-      <section className="max-w-7xl mx-auto px-6 md:px-12 space-y-10">
-        <div className="text-center space-y-3 max-w-2xl mx-auto">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 space-y-8 sm:space-y-10">
+        <div className="text-center space-y-2 sm:space-y-3 max-w-2xl mx-auto">
           <span className="text-xs font-bold uppercase tracking-widest text-[#DC926E]">
             Deep Learning Vision Model
           </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-[#2B2623]">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#2B2623]">
             Identifies 9 Key Skin Parameters
           </h2>
-          <p className="text-sm text-[#6B615B] font-light">
+          <p className="text-xs sm:text-sm text-[#6B615B] font-light">
             Our computer vision model processes uploaded facial images to detect specific concerns and classify your skin type with quantitative accuracy.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          
-          <div className="p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-6">
+
+          <div className="p-4 sm:p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-[#2B2623]">01. Acne Vulgaris</span>
-              <span className="text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2 py-0.5 rounded-sm">Active Blemishes</span>
+              <span className="text-xs sm:text-sm font-bold text-[#2B2623]">01. Acne Vulgaris</span>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2 py-0.5 rounded-sm">Active Blemishes</span>
             </div>
             <p className="text-xs text-[#7A7069]">Identifies inflammatory papules, pustules, and breakout severity across facial zones.</p>
           </div>
 
-          <div className="p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors">
+          <div className="p-4 sm:p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-[#2B2623]">02. Blackheads & Whiteheads</span>
-              <span className="text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2 py-0.5 rounded-sm">Comedones</span>
+              <span className="text-xs sm:text-sm font-bold text-[#2B2623]">02. Blackheads &amp; Whiteheads</span>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2 py-0.5 rounded-sm">Comedones</span>
             </div>
             <p className="text-xs text-[#7A7069]">Maps open and closed comedones in the T-zone, nose, and chin areas.</p>
           </div>
 
-          <div className="p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors">
+          <div className="p-4 sm:p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-[#2B2623]">03. Enlarged Pores</span>
-              <span className="text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2 py-0.5 rounded-sm">Pore Density</span>
+              <span className="text-xs sm:text-sm font-bold text-[#2B2623]">03. Enlarged Pores</span>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2 py-0.5 rounded-sm">Pore Density</span>
             </div>
             <p className="text-xs text-[#7A7069]">Calculates pore diameter and cluster density across cheek and forehead regions.</p>
           </div>
 
-          <div className="p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors">
+          <div className="p-4 sm:p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-[#2B2623]">04. Pigmentation & Dark Spots</span>
-              <span className="text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2 py-0.5 rounded-sm">Melanin Maps</span>
+              <span className="text-xs sm:text-sm font-bold text-[#2B2623]">04. Pigmentation &amp; Dark Spots</span>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2 py-0.5 rounded-sm">Melanin Maps</span>
             </div>
             <p className="text-xs text-[#7A7069]">Detects hyperpigmentation, sun spots, and uneven melanin concentration.</p>
           </div>
 
-          <div className="p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors">
+          <div className="p-4 sm:p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-[#2B2623]">05. Acne Scars</span>
-              <span className="text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2 py-0.5 rounded-sm">Post-Breakout</span>
+              <span className="text-xs sm:text-sm font-bold text-[#2B2623]">05. Acne Scars</span>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2 py-0.5 rounded-sm">Post-Breakout</span>
             </div>
             <p className="text-xs text-[#7A7069]">Evaluates post-acne indentations, ice-pick scars, and surface texture irregularities.</p>
           </div>
 
-          <div className="p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors">
+          <div className="p-4 sm:p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-[#2B2623]">06. Redness & Erythema</span>
-              <span className="text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2 py-0.5 rounded-sm">Inflammation</span>
+              <span className="text-xs sm:text-sm font-bold text-[#2B2623]">06. Redness &amp; Erythema</span>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2 py-0.5 rounded-sm">Inflammation</span>
             </div>
             <p className="text-xs text-[#7A7069]">Tracks vascular redness, rosacea tendencies, and sensitive skin reactions.</p>
           </div>
 
-          <div className="p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors sm:col-span-2 lg:col-span-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-bold text-[#2B2623]">07 - 09. Skin Type, Moisture Barrier & Preventive Telemetry</span>
-              <span className="text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2.5 py-1 rounded-sm">Comprehensive Diagnostics</span>
+          <div className="p-4 sm:p-5 bg-white border border-[#E8DFD8] rounded-md shadow-sm space-y-2 hover:border-[#DC926E] transition-colors sm:col-span-2 lg:col-span-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+              <span className="text-xs sm:text-sm font-bold text-[#2B2623]">07 - 09. Skin Type, Moisture Barrier &amp; Preventive Telemetry</span>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-[#DC926E] bg-[#F5EBE6] px-2.5 py-1 rounded-sm w-fit">Comprehensive Diagnostics</span>
             </div>
             <p className="text-xs text-[#7A7069] leading-relaxed">
               Classifies skin into Oily, Dry, Combination, Sensitive, or Normal types, calculates moisture retention, and offers tailored preventive care suggestions.
@@ -455,17 +455,17 @@ const Home = () => {
       </section>
 
       {/* SECTION 4: INTERACTIVE AI SKIN ANALYSIS SIMULATOR */}
-      <section id="analysis-simulator" className="max-w-7xl mx-auto px-6 md:px-12">
-        <div className="bg-white rounded-lg border border-[#E8DFD8] shadow-lg overflow-hidden p-6 sm:p-10 space-y-8">
-          
+      <section id="analysis-simulator" className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12">
+        <div className="bg-white rounded-xl border border-[#E8DFD8] shadow-lg overflow-hidden p-4 sm:p-8 md:p-10 space-y-6 sm:space-y-8">
+
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-[#E8DFD8]">
-            <div className="space-y-2">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 pb-4 sm:pb-6 border-b border-[#E8DFD8]">
+            <div className="space-y-1.5 sm:space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#F5EBE6] text-xs font-semibold text-[#DC926E]">
                 <HiOutlineSparkles />
                 <span>INTERACTIVE AI DEMO</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-[#2B2623]">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-[#2B2623]">
                 Try DermaVision Skin Analysis
               </h2>
               <p className="text-xs sm:text-sm text-[#7A7069] max-w-xl font-light">
@@ -474,56 +474,53 @@ const Home = () => {
             </div>
 
             {/* Presets */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 w-full md:w-auto">
               <button
                 onClick={() => triggerScanSimulation('acne_pores')}
-                className={`px-4 py-2 rounded-md text-xs font-semibold transition-all ${
-                  activePreset === 'acne_pores'
+                className={`flex-1 sm:flex-initial text-center justify-center px-3.5 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer ${activePreset === 'acne_pores'
                     ? 'bg-[#DC926E] text-white shadow-sm'
                     : 'bg-[#F5EBE6] text-[#5A524C] hover:bg-[#EAE0DA]'
-                }`}
+                  }`}
               >
-                Acne & Pores
+                Acne &amp; Pores
               </button>
               <button
                 onClick={() => triggerScanSimulation('pigmentation_spots')}
-                className={`px-4 py-2 rounded-md text-xs font-semibold transition-all ${
-                  activePreset === 'pigmentation_spots'
+                className={`flex-1 sm:flex-initial text-center justify-center px-3.5 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer ${activePreset === 'pigmentation_spots'
                     ? 'bg-[#DC926E] text-white shadow-sm'
                     : 'bg-[#F5EBE6] text-[#5A524C] hover:bg-[#EAE0DA]'
-                }`}
+                  }`}
               >
-                Pigmentation & Spots
+                Pigmentation &amp; Spots
               </button>
               <button
                 onClick={() => triggerScanSimulation('type_redness')}
-                className={`px-4 py-2 rounded-md text-xs font-semibold transition-all ${
-                  activePreset === 'type_redness'
+                className={`flex-1 sm:flex-initial text-center justify-center px-3.5 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer ${activePreset === 'type_redness'
                     ? 'bg-[#DC926E] text-white shadow-sm'
                     : 'bg-[#F5EBE6] text-[#5A524C] hover:bg-[#EAE0DA]'
-                }`}
+                  }`}
               >
-                Redness & Skin Type
+                Redness &amp; Skin Type
               </button>
             </div>
           </div>
 
           {/* Simulator Display */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+
             {/* Visual Scan Screen */}
-            <div className="lg:col-span-5 relative rounded-md overflow-hidden border border-[#E8DFD8] bg-[#FAF8F5] h-[380px] flex items-center justify-center group">
+            <div className="lg:col-span-5 relative rounded-lg overflow-hidden border border-[#E8DFD8] bg-[#FAF8F5] h-60 sm:h-72 md:h-[380px] flex items-center justify-center group">
               <img
                 src={scanUiImg}
                 alt="AI Analysis Simulation"
                 className="w-full h-full object-cover"
               />
-              
+
               {/* Scan Overlay Animation */}
               {isScanning && (
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-xs flex flex-col items-center justify-center space-y-4">
-                  <div className="w-14 h-14 border-4 border-[#DC926E] border-t-transparent rounded-full animate-spin" />
-                  <p className="text-white text-xs font-semibold tracking-wide uppercase">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center space-y-3 p-4 text-center">
+                  <div className="w-10 sm:w-14 h-10 sm:h-14 border-3 sm:border-4 border-[#DC926E] border-t-transparent rounded-full animate-spin" />
+                  <p className="text-white text-[11px] sm:text-xs font-semibold tracking-wide uppercase">
                     Computing Deep Learning Feature Vectors...
                   </p>
                 </div>
@@ -535,18 +532,18 @@ const Home = () => {
                 </div>
               )}
 
-              <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md px-3.5 py-1.5 rounded-md text-white text-xs flex items-center gap-2">
+              <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-md text-white text-xs flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
                 <span>AI Confidence: <strong className="text-[#DC926E]">{scanPresets[activePreset].confidenceScore}</strong></span>
               </div>
             </div>
 
             {/* Generated Analysis Results */}
-            <div className="lg:col-span-7 space-y-6">
-              
-              <div className="flex items-center justify-between pb-3 border-b border-[#E8DFD8]">
+            <div className="lg:col-span-7 space-y-5 sm:space-y-6">
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E8DFD8]">
                 <div>
-                  <h3 className="text-xl font-bold text-[#2B2623]">
+                  <h3 className="text-lg sm:text-xl font-bold text-[#2B2623]">
                     {scanPresets[activePreset].title}
                   </h3>
                   <p className="text-xs text-[#7A7069] mt-0.5">
@@ -557,7 +554,7 @@ const Home = () => {
                 <button
                   onClick={handleDownloadReport}
                   disabled={downloadingReport}
-                  className="bg-[#2B2623] hover:bg-[#423C38] text-white text-xs font-semibold px-4 py-2.5 rounded-md flex items-center gap-2 transition-all shadow-sm"
+                  className="w-full sm:w-auto bg-[#2B2623] hover:bg-[#423C38] text-white text-xs font-semibold px-4 py-2.5 rounded-md flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
                 >
                   <HiOutlineDownload className="text-sm text-[#DC926E]" />
                   <span>{downloadingReport ? 'Generating PDF...' : 'Download Report'}</span>
@@ -610,82 +607,76 @@ const Home = () => {
       </section>
 
       {/* SECTION 5: NEARBY DERMATOLOGIST & CLINIC LOCATOR */}
-      <section id="clinic-finder" className="max-w-7xl mx-auto px-6 md:px-12 space-y-10">
-        <div className="bg-[#FAF8F5] rounded-lg border border-[#E8DFD8] p-8 space-y-8">
-          
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-2">
+      <section id="dermatologists" className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 space-y-8 sm:space-y-10">
+        <div className="bg-gradient-to-br from-[#FAF8F5] to-[#F5EBE6] rounded-2xl border border-[#E8DFD8] p-5 sm:p-8 md:p-12">
+          <div className="flex flex-col md:flex-row md:items-center gap-6 sm:gap-8">
+            <div className="flex-1 space-y-3 sm:space-y-4">
               <span className="text-xs font-bold uppercase tracking-widest text-[#DC926E]">
                 Professional Care Connectivity
               </span>
-              <h2 className="text-3xl font-extrabold text-[#2B2623]">
-                Locate Nearby Dermatologists & Skin Clinics
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-[#2B2623]">
+                Locate Nearby Dermatologists &amp; Skin Clinics
               </h2>
-              <p className="text-xs sm:text-sm text-[#7A7069] max-w-xl font-light">
-                DermaVision assists users in finding qualified dermatologists and certified skin clinics for professional consultation whenever needed.
+              <p className="text-xs sm:text-sm text-[#7A7069] max-w-md font-light leading-relaxed">
+                After your AI skin analysis, DermaVision shows you an <strong className="text-[#2B2623]">interactive satellite map</strong> with
+                verified dermatologists and certified clinics near you — so you can book a professional
+                consultation with your skin report in hand.
               </p>
-            </div>
-
-            {/* Location Search Bar */}
-            <div className="flex items-center gap-2 bg-white p-2 rounded-md border border-[#E8DFD8] shadow-sm w-full md:w-80">
-              <HiOutlineLocationMarker className="text-lg text-[#DC926E] ml-2" />
-              <input
-                type="text"
-                placeholder="Enter City or Pincode..."
-                value={searchLocation}
-                onChange={(e) => setSearchLocation(e.target.value)}
-                className="w-full text-xs text-[#2B2623] placeholder-gray-400 outline-none bg-transparent"
-              />
-              <button 
-                onClick={() => alert(`Searching dermatologists near: ${searchLocation || 'Current Location'}`)}
-                className="bg-[#DC926E] hover:bg-[#c87e5b] text-white text-xs px-3.5 py-2 rounded-md font-semibold"
-              >
-                Search
-              </button>
-            </div>
-          </div>
-
-          {/* Clinic List */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {sampleClinics.map((clinic) => (
-              <div 
-                key={clinic.id} 
-                className="bg-white p-6 rounded-md border border-[#E8DFD8] shadow-sm space-y-4 hover:border-[#DC926E] transition-all flex flex-col justify-between"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#DC926E] bg-[#F5EBE6] px-2.5 py-0.5 rounded-sm">
-                      {clinic.distance}
-                    </span>
-                    <span className="text-xs text-amber-600 font-semibold">{clinic.rating}</span>
-                  </div>
-                  <h4 className="font-bold text-[#2B2623] text-sm">{clinic.name}</h4>
-                  <p className="text-xs text-[#7A7069] font-medium">{clinic.clinic}</p>
-                  <p className="text-[11px] text-[#8C837E]">{clinic.address}</p>
-                  <div className="text-[11px] text-[#5A524C] pt-2 border-t border-[#E8DFD8]">
-                    Specialty: <span className="font-semibold text-[#2B2623]">{clinic.specialty}</span>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => alert(`Connecting with ${clinic.name}. You can send your downloadable PDF skin report for triage.`)}
-                  className="w-full bg-[#2B2623] hover:bg-[#423C38] text-white text-xs font-semibold py-2.5 rounded-md transition-colors"
-                >
-                  Book Consultation
-                </button>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {[
+                  { icon: '🛰️', text: 'Satellite Map View' },
+                  { icon: '📍', text: 'GPS Location' },
+                  { icon: '⭐', text: 'Rated Doctors' },
+                  { icon: '📋', text: 'Book with Report' },
+                ].map(({ icon, text }) => (
+                  <span key={text} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#5A524C] bg-white border border-[#E8DFD8] px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full">
+                    {icon} {text}
+                  </span>
+                ))}
               </div>
-            ))}
-          </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+                <Link
+                  to="/dermatologists"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#DC926E] hover:bg-[#c87e5b] text-white text-xs sm:text-sm font-bold px-5 sm:px-6 py-3 rounded-xl shadow-sm transition-all text-center"
+                >
+                  <HiOutlineLocationMarker className="text-base" />
+                  <span>Find Dermatologists Near Me</span>
+                  <HiArrowRight className="text-base" />
+                </Link>
+                <Link
+                  to="/analysis"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white hover:bg-[#FAF8F5] text-[#5A524C] border border-[#E8DFD8] text-xs sm:text-sm font-semibold px-5 py-3 rounded-xl shadow-sm transition-all text-center"
+                >
+                  Start Skin Analysis First
+                </Link>
+              </div>
+            </div>
 
+            {/* Visual preview */}
+            <div className="hidden lg:flex flex-col items-center justify-center w-72 h-52 rounded-xl bg-[#1e293b] relative overflow-hidden border border-[#334155] shadow-xl flex-shrink-0">
+              <div className="absolute inset-0 opacity-20" style={{
+                backgroundImage: 'radial-gradient(circle at 30% 40%, #DC926E 0%, transparent 50%), radial-gradient(circle at 70% 70%, #6B7CDB 0%, transparent 40%)'
+              }} />
+              <div className="relative z-10 text-center space-y-2">
+                <div className="text-5xl">🛰️</div>
+                <p className="text-white font-bold text-sm">Satellite Dermatologist Map</p>
+                <p className="text-slate-400 text-xs">Unlocks after skin analysis</p>
+              </div>
+              {/* Fake pins */}
+              {[['20%', '30%', '#DC926E'], ['60%', '50%', '#DC926E'], ['40%', '70%', '#6B7CDB']].map(([l, t, c], i) => (
+                <div key={i} style={{ position: 'absolute', left: l, top: t, width: 12, height: 12, borderRadius: '50%', background: c, border: '2px solid white', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }} />
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
       {/* SECTION 6: DECISION SUPPORT DISCLAIMER & AI MISSION */}
-      <section className="max-w-7xl mx-auto px-6 md:px-12">
-        <div className="p-8 rounded-lg bg-white border border-[#E8DFD8] space-y-4 text-left">
-          <div className="flex items-center gap-3 text-[#DC926E]">
-            <HiOutlineShieldCheck className="text-2xl" />
-            <h3 className="text-lg font-bold text-[#2B2623]">AI Decision-Support System Positioning</h3>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12">
+        <div className="p-5 sm:p-8 rounded-xl bg-white border border-[#E8DFD8] space-y-3 sm:space-y-4 text-left shadow-sm">
+          <div className="flex items-center gap-2.5 sm:gap-3 text-[#DC926E]">
+            <HiOutlineShieldCheck className="text-2xl shrink-0" />
+            <h3 className="text-base sm:text-lg font-bold text-[#2B2623]">AI Decision-Support System Positioning</h3>
           </div>
           <p className="text-xs sm:text-sm text-[#6B615B] leading-relaxed">
             DermaVision is engineered as an AI-powered skin analysis and decision-support system rather than a replacement for professional medical diagnosis. Its primary objective is to promote early skin health awareness, provide personalized skincare guidance, generate informative skin analysis reports, and connect users with qualified dermatologists when necessary.
@@ -694,35 +685,34 @@ const Home = () => {
       </section>
 
       {/* SECTION 7: FAQ ACCORDION */}
-      <section id="faq" className="max-w-4xl mx-auto px-6 md:px-12 space-y-8">
-        <div className="text-center space-y-3">
+      <section id="faq" className="max-w-4xl mx-auto px-4 sm:px-6 md:px-12 space-y-6 sm:space-y-8">
+        <div className="text-center space-y-2 sm:space-y-3">
           <span className="text-xs font-bold uppercase tracking-widest text-[#DC926E]">
             Frequently Asked Questions
           </span>
-          <h2 className="text-3xl font-bold text-[#2B2623]">
+          <h2 className="text-2xl sm:text-3xl font-bold text-[#2B2623]">
             Understanding DermaVision
           </h2>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {faqs.map((faq, idx) => (
             <div
               key={idx}
-              className="bg-white rounded-md border border-[#E8DFD8] overflow-hidden transition-all"
+              className="bg-white rounded-lg border border-[#E8DFD8] overflow-hidden transition-all shadow-xs"
             >
               <button
                 onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                className="w-full p-5 text-left flex items-center justify-between gap-4 font-semibold text-sm text-[#2B2623] hover:text-[#DC926E] transition-colors"
+                className="w-full p-4 sm:p-5 text-left flex items-center justify-between gap-3 font-semibold text-xs sm:text-sm text-[#2B2623] hover:text-[#DC926E] transition-colors cursor-pointer"
               >
                 <span>{faq.q}</span>
                 <HiChevronDown
-                  className={`text-lg transition-transform duration-300 ${
-                    openFaq === idx ? 'rotate-180 text-[#DC926E]' : 'text-[#8C837E]'
-                  }`}
+                  className={`text-base sm:text-lg shrink-0 transition-transform duration-300 ${openFaq === idx ? 'rotate-180 text-[#DC926E]' : 'text-[#8C837E]'
+                    }`}
                 />
               </button>
               {openFaq === idx && (
-                <div className="px-5 pb-5 pt-1 text-xs text-[#6B615B] leading-relaxed border-t border-[#F5EBE6]">
+                <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-1 text-xs text-[#6B615B] leading-relaxed border-t border-[#F5EBE6]">
                   {faq.a}
                 </div>
               )}
@@ -732,30 +722,30 @@ const Home = () => {
       </section>
 
       {/* SECTION 8: CTA CALLOUT */}
-      <section className="max-w-7xl mx-auto px-6 md:px-12">
-        <div className="relative rounded-lg bg-gradient-to-r from-[#2B2623] via-[#38322F] to-[#2B2623] text-white p-10 sm:p-16 overflow-hidden shadow-lg text-center space-y-6">
-          <div className="max-w-2xl mx-auto space-y-4">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12">
+        <div className="relative rounded-2xl bg-gradient-to-r from-[#2B2623] via-[#38322F] to-[#2B2623] text-white p-6 sm:p-10 md:p-16 overflow-hidden shadow-xl text-center space-y-5 sm:space-y-6">
+          <div className="max-w-2xl mx-auto space-y-3 sm:space-y-4">
             <span className="text-xs font-semibold tracking-widest uppercase text-[#DC926E]">
               Ready for Intelligent Skin Management?
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-              Analyze Your Skin & Generate Your Report
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
+              Analyze Your Skin &amp; Generate Your Report
             </h2>
-            <p className="text-sm text-[#D8CFCA] font-light leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#D8CFCA] font-light leading-relaxed">
               Analyze facial skin concerns, compute confidence scores, receive personalized routines, and locate nearby skin clinics.
             </p>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row justify-center items-stretch sm:items-center gap-3 sm:gap-4 pt-2">
             <Link
               to="/analysis"
-              className="bg-[#DC926E] hover:bg-[#c87e5b] text-white font-semibold text-sm px-8 py-3.5 rounded-md shadow-md transition-all duration-200"
+              className="w-full sm:w-auto bg-[#DC926E] hover:bg-[#c87e5b] text-white font-semibold text-xs sm:text-sm px-6 sm:px-8 py-3 sm:py-3.5 rounded-md shadow-md transition-all duration-200 text-center"
             >
               Launch AI Skin Analysis
             </Link>
             <Link
               to="/register"
-              className="bg-[#3D3734] hover:bg-[#4A4340] text-white font-semibold text-sm px-8 py-3.5 rounded-md border border-[#524A46] transition-all"
+              className="w-full sm:w-auto bg-[#3D3734] hover:bg-[#4A4340] text-white font-semibold text-xs sm:text-sm px-6 sm:px-8 py-3 sm:py-3.5 rounded-md border border-[#524A46] transition-all text-center"
             >
               Register Account
             </Link>

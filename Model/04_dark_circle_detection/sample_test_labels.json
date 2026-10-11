@@ -1,0 +1,17 @@
+[
+  {
+    "path": "frontend/DERMAVISION/src/assets/registergirl.jpg",
+    "expected": 0,
+    "description": "Clear under-eye, fair skin, frontal studio lighting"
+  },
+  {
+    "path": "Model/DATASET/darkcircle/Dark Circles Detection.v3i.yolov8/test/images/_1583310574577_jpg.rf.859b5ae7976e10a2665be5dcae98c7e6.jpg",
+    "expected": 1,
+    "description": "Visible bilateral infraorbital dark circles"
+  },
+  {
+    "path": "Model/DATASET/darkcircle/Dark Circles Detection.v3i.yolov8/test/images/_1583412718575_jpg.rf.fa262e3d5500e28f3a382103f563dd8d.jpg",
+    "expected": 1,
+    "description": "Mild periorbital shadow"
+  }
+]

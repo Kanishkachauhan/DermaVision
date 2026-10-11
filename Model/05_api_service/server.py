@@ -26,11 +26,18 @@ get_engine = acne_module.get_engine
 dc_module = importlib.import_module("04_dark_circle_detection.dark_circle_detector")
 analyze_dark_circles = dc_module.analyze_dark_circles
 
+redness_module = importlib.import_module("models.redness_detector")
+get_redness_detector = redness_module.get_redness_detector
+
+cv_filters_mod = importlib.import_module("03_preprocessing.opencv_filters")
+preprocess_dermatology_pipeline = cv_filters_mod.preprocess_dermatology_pipeline
+HAS_OPENCV = cv_filters_mod.HAS_OPENCV
+
 
 app = FastAPI(
     title="DermaVision AI Microservice",
-    description="Deep Learning Facial & Dermatological Diagnostic Engine using EfficientNet-B0/B3 & MediaPipe CIELAB",
-    version="2.0.0"
+    description="Deep Learning Facial & Dermatological Diagnostic Engine using EfficientNet-B0/B3, MediaPipe CIELAB & ViT Face Characteristics",
+    version="2.1.0"
 )
 
 # Enable CORS for Node.js Backend (port 5001) and Vite Frontend (port 5173)
@@ -60,10 +67,69 @@ class DarkCircleRequest(BaseModel):
     darkCirclesPercentage: Optional[float] = None
     metrics: Optional[Dict[str, Any]] = None
 
+class RednessRequest(BaseModel):
+    image: Optional[str] = None
+    landmarks: Optional[Any] = None
+    crops: Optional[Dict[str, Any]] = None
+    zoneRedness: Optional[Dict[str, Any]] = None
+
 class FullSkinRequest(BaseModel):
     image: str
     variant: Optional[str] = "b0"
     landmarks: Optional[Any] = None
+
+class SkinFilterRequest(BaseModel):
+    image: str
+
+@app.post("/api/filter/skin")
+def filter_skin_endpoint(req: SkinFilterRequest):
+    try:
+        import io
+        import base64
+        from PIL import Image
+        import numpy as np
+
+        img_str = req.image
+        if img_str.startswith("data:image"):
+            img_str = img_str.split(",", 1)[1]
+        raw_bytes = base64.b64decode(img_str)
+        pil_img = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
+        np_img = np.array(pil_img)
+
+        pipeline_result = preprocess_dermatology_pipeline(np_img)
+
+        # Convert processed numpy back to base64 for frontend consumption
+        filtered_pil = Image.fromarray(pipeline_result["filtered_image"])
+        buf = io.BytesIO()
+        filtered_pil.save(buf, format="JPEG", quality=90)
+        filtered_b64 = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
+
+        # Convert erythema mask to base64
+        mask_pil = Image.fromarray(pipeline_result["erythema_mask"])
+        buf_mask = io.BytesIO()
+        mask_pil.save(buf_mask, format="PNG")
+        mask_b64 = "data:image/png;base64," + base64.b64encode(buf_mask.getvalue()).decode("utf-8")
+
+        cielab = pipeline_result["cielab"]
+        mean_l = float(np.mean(cielab["L"]))
+        mean_a = float(np.mean(cielab["a"]))
+        mean_b = float(np.mean(cielab["b"]))
+
+        return {
+            "success": True,
+            "data": {
+                "filteredImage": filtered_b64,
+                "erythemaMask": mask_b64,
+                "opencvAccelerated": pipeline_result["opencv_accelerated"],
+                "telemetry": {
+                    "meanLightnessL": round(mean_l, 1),
+                    "meanErythemaA": round(mean_a, 1),
+                    "meanMelaninB": round(mean_b, 1),
+                }
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OpenCV skin filtering failed: {str(e)}")
 
 @app.get("/")
 @app.get("/api/health")
@@ -76,9 +142,10 @@ def health_check():
         "models": {
             "acne_model": "EfficientNet-B0 / EfficientNet-B3 (Fine-Tuned)",
             "dark_circles": "MediaPipe Infraorbital CIELAB Telemetry",
+            "redness": "ViT-FaceCharacteristics (varun1505/face-characteristics)",
             "device": device
         },
-        "version": "2.0.0",
+        "version": "2.1.0",
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ")
     }
 
@@ -118,11 +185,25 @@ def analyze_dark_circles_endpoint(req: DarkCircleRequest):
         result = analyze_dark_circles(
             image_input=img_source,
             landmarks=req.landmarks,
-            client_metrics=metrics
+            client_metrics=metrics,
+            left_crop=req.leftEyeCrop,
+            right_crop=req.rightEyeCrop
         )
-        return {"success": True, "data": result}
+        return {"success": result.get("success", True), "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Dark circle analysis error: {str(e)}")
+
+@app.post("/api/analyze/redness")
+def analyze_redness_endpoint(req: RednessRequest):
+    try:
+        detector = get_redness_detector()
+        if not req.image and not req.crops:
+            raise HTTPException(status_code=400, detail="Image or zone crops payload required.")
+        img_payload = req.image or (req.crops.get("leftCheek") if req.crops else None)
+        result = detector.analyze_face(img_payload, landmarks=req.landmarks, crops=req.crops)
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ViT Redness analysis error: {str(e)}")
 
 @app.post("/api/analyze/full-skin")
 def analyze_full_skin(req: FullSkinRequest):
@@ -131,13 +212,16 @@ def analyze_full_skin(req: FullSkinRequest):
         acne_engine = get_engine(variant=variant)
         acne_res = acne_engine.analyze_face(req.image, landmarks=req.landmarks)
         dark_circle_res = analyze_dark_circles(req.image, landmarks=req.landmarks)
+        redness_det = get_redness_detector()
+        redness_res = redness_det.analyze_face(req.image, landmarks=req.landmarks)
 
         return {
             "success": True,
             "data": {
                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "acne": acne_res,
-                "darkCircles": dark_circle_res
+                "darkCircles": dark_circle_res,
+                "redness": redness_res
             }
         }
     except Exception as e:

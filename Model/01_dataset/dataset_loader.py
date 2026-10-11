@@ -181,6 +181,85 @@ def get_data_loaders(target_size=224, batch_size=16, include_pigmentation=True):
     return train_loader, valid_loader, test_loader, train_dataset, valid_dataset
 
 
+# ─── Dark Circle YOLOv8 Dataset Builder ───────────────────────────────────────
+class DarkCircleDataset(Dataset):
+    """
+    Dataset loader for Model/DATASET/darkcircle/Dark Circles Detection.v3i.yolov8
+    Extracts annotated under-eye periorbital dark circle and puffy eye annotations.
+    """
+    def __init__(self, split="train", target_size=224, transform=None):
+        import glob
+        self.split_dir = os.path.join(DATASET_ROOT, "darkcircle", "Dark Circles Detection.v3i.yolov8", split)
+        self.samples = []
+        self.target_size = target_size
+
+        if transform is not None:
+            self.transform = transform
+        else:
+            self.transform = transforms.Compose([
+                transforms.Resize((target_size, target_size)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+
+        images_dir = os.path.join(self.split_dir, "images")
+        labels_dir = os.path.join(self.split_dir, "labels")
+
+        for img_path in glob.glob(os.path.join(images_dir, "*.*")):
+            ext = os.path.splitext(img_path)[1].lower()
+            if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
+                continue
+            base = os.path.splitext(os.path.basename(img_path))[0]
+            lbl_path = os.path.join(labels_dir, f"{base}.txt")
+
+            boxes = []
+            if os.path.exists(lbl_path):
+                with open(lbl_path, "r") as f:
+                    for line in f:
+                        parts = line.strip().split()
+                        if len(parts) >= 5:
+                            coords = list(map(float, parts[1:]))
+                            if len(coords) == 4:
+                                cx, cy, w, h = coords
+                                boxes.append((cx - w/2, cy - h/2, w, h))
+                            else:
+                                xs, ys = coords[0::2], coords[1::2]
+                                x1, x2 = min(xs), max(xs)
+                                y1, y2 = min(ys), max(ys)
+                                boxes.append((x1, y1, x2 - x1, y2 - y1))
+
+            self.samples.append({"image_path": img_path, "boxes": boxes})
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        item = self.samples[idx]
+        image = Image.open(item["image_path"]).convert("RGB")
+        tensor_img = self.transform(image)
+        return {
+            "image": tensor_img,
+            "box_count": len(item["boxes"]),
+            "boxes": item["boxes"],
+            "path": item["image_path"]
+        }
+
+
+def get_darkcircle_loaders(target_size=224, batch_size=16):
+    train_ds = DarkCircleDataset(split="train", target_size=target_size)
+    valid_ds = DarkCircleDataset(split="valid", target_size=target_size)
+    test_ds  = DarkCircleDataset(split="test",  target_size=target_size)
+
+    return (
+        DataLoader(train_ds, batch_size=batch_size, shuffle=True),
+        DataLoader(valid_ds, batch_size=batch_size, shuffle=False) if len(valid_ds) > 0 else None,
+        DataLoader(test_ds,  batch_size=batch_size, shuffle=False) if len(test_ds) > 0 else None,
+        train_ds,
+        valid_ds
+    )
+
+
+
 if __name__ == "__main__":
     train_loader, valid_loader, test_loader, tr_ds, va_ds = get_data_loaders(target_size=224, batch_size=8)
     print(f"Loaded {len(tr_ds)} training samples, {len(va_ds)} validation samples.")

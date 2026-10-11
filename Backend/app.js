@@ -6,14 +6,24 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 
 import { errorHandler, notFound } from './middleware/errorHandler.js';
-import authRoutes from './routes/authRoutes.js';
+import authRoutes    from './routes/authRoutes.js';
 import analysisRoutes from './routes/analysisRoutes.js';
+import doctorRoutes  from './routes/doctorRoutes.js';
+
 
 
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
+app.use(cors({
+  origin: [
+    process.env.CLIENT_URL || 'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
+  ],
+  credentials: true,
+}));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -26,8 +36,10 @@ app.get('/api/health', (req, res) => {
     message: 'DermaVision API is running',
      timestamp: new Date() });
 });
-app.use('/api/auth', authRoutes);
+app.use('/api/auth',     authRoutes);
 app.use('/api/analysis', analysisRoutes);
+app.use('/api/doctors',  doctorRoutes);
+
 
 app.use(notFound);
 app.use(errorHandler);

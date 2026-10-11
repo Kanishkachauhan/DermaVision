@@ -26,6 +26,17 @@ const AnalysisHub = () => {
       color: "#7C5CFC",
       bg: "#F3F0FF",
     },
+    {
+      to: "/analysis?tab=redness",
+      icon: "🌸",
+      title: "Facial Redness & Erythema",
+      subtitle: "Vascular flush & cutaneous sensitivity scan",
+      description:
+        "Detects facial erythema, capillary flush, and reactive sensitivity across 5 zones using calibrated dermal vision analysis. Evaluates severity and localized distribution.",
+      tags: ["Facial Erythema", "Vascular Flush", "Sensitivity"],
+      color: "#EF4444",
+      bg: "#FEF2F2",
+    },
   ];
 
   return (

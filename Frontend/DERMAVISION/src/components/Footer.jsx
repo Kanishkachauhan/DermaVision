@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 
 const Footer = () => {
   return (
-    <footer className="bg-[#2B2623] text-[#D8CFCA] pt-16 pb-12 border-t border-[#3D3734]">
-      <div className="max-w-7xl mx-auto px-6 md:px-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+    <footer className="bg-[#2B2623] text-[#D8CFCA] pt-12 sm:pt-16 pb-8 sm:pb-12 border-t border-[#3D3734]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-12 sm:mb-16">
           
           {/* Brand Info */}
-          <div className="md:col-span-2 space-y-4">
+          <div className="sm:col-span-2 space-y-4">
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-md bg-[#DC926E] flex items-center justify-center text-white font-bold text-xs">
                 DV
@@ -27,10 +27,10 @@ const Footer = () => {
 
           {/* Quick Links */}
           <div>
-            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
+            <h4 className="text-xs sm:text-sm font-semibold text-white uppercase tracking-wider mb-3 sm:mb-4">
               Platform Links
             </h4>
-            <ul className="space-y-2.5 text-sm">
+            <ul className="space-y-2.5 text-xs sm:text-sm">
               <li>
                 <Link to="/home" className="hover:text-[#DC926E] transition-colors">
                   Home Overview
@@ -61,10 +61,10 @@ const Footer = () => {
 
           {/* Contact & Support */}
           <div>
-            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
+            <h4 className="text-xs sm:text-sm font-semibold text-white uppercase tracking-wider mb-3 sm:mb-4">
               Clinical Contact
             </h4>
-            <ul className="space-y-2.5 text-sm text-[#A89F99]">
+            <ul className="space-y-2.5 text-xs sm:text-sm text-[#A89F99]">
               <li>
                 <span className="block text-white text-xs font-medium">Research & Support</span>
                 support@dermavision.ai
@@ -85,9 +85,9 @@ const Footer = () => {
         </div>
 
         {/* Bottom Section */}
-        <div className="border-t border-[#3D3734] pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#8C837E]">
+        <div className="border-t border-[#3D3734] pt-6 sm:pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#8C837E] text-center sm:text-left">
           <p>© 2026 DermaVision AI Inc. All rights reserved. Built with clinical precision.</p>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap justify-center sm:justify-end gap-4 sm:gap-6">
             <a href="#privacy" className="hover:text-white transition-colors">Privacy Policy</a>
             <a href="#terms" className="hover:text-white transition-colors">Terms of Telehealth</a>
             <a href="#security" className="hover:text-white transition-colors">HIPAA Compliance</a>
