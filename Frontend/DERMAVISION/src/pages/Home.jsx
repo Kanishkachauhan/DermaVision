@@ -378,7 +378,7 @@ const Home = () => {
       </section>
 
       {/* SECTION 3: 9-POINT SKIN CONCERN DETECTION CAPABILITIES */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 space-y-8 sm:space-y-10">
+      <section id="technology" className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 space-y-8 sm:space-y-10">
         <div className="text-center space-y-2 sm:space-y-3 max-w-2xl mx-auto">
           <span className="text-xs font-bold uppercase tracking-widest text-[#DC926E]">
             Deep Learning Vision Model

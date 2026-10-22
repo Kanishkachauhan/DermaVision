@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import UserRegister from "./pages/UserRegister";
 import Home from "./pages/Home";
+import HowItWorks from "./pages/HowItWorks";
 import SkinAnalysis from "./pages/SkinAnalysis";
 import FindDermatologists from "./pages/FindDermatologists";
 import Header from "./components/Header";
@@ -55,6 +56,7 @@ const App = () => (
       <Routes>
         <Route path="/"                    element={<MainLayout><Home /></MainLayout>} />
         <Route path="/home"                element={<MainLayout><Home /></MainLayout>} />
+        <Route path="/how-it-works"        element={<MainLayout><HowItWorks /></MainLayout>} />
         <Route
           path="/analysis"
           element={
