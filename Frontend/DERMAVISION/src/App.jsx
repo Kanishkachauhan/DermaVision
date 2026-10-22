@@ -6,6 +6,7 @@ import UserRegister from "./pages/UserRegister";
 import Home from "./pages/Home";
 import SkinAnalysis from "./pages/SkinAnalysis";
 import FindDermatologists from "./pages/FindDermatologists";
+import Products from "./pages/Products";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -55,6 +56,8 @@ const App = () => (
       <Routes>
         <Route path="/"                    element={<MainLayout><Home /></MainLayout>} />
         <Route path="/home"                element={<MainLayout><Home /></MainLayout>} />
+        <Route path="/products"            element={<MainLayout><Products /></MainLayout>} />
+        <Route path="/product"             element={<Navigate to="/products" replace />} />
         <Route
           path="/analysis"
           element={

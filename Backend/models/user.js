@@ -17,6 +17,18 @@ const userSchema = new mongoose.Schema(
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      select: false,
+    },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      select: false,
+    },
     password: {
         type: String, 
         required: [true, 'Password is required'],
@@ -66,6 +78,7 @@ userSchema.methods.toSafeObject = function () {
   const obj = this.toObject();
 
   delete obj.password;
+  delete obj.googleId;
   delete obj.refreshTokenHash;
   delete obj.otpCode;
   delete obj.otpExpires;
