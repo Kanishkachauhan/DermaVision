@@ -23,3 +23,8 @@ venv/
 
 # macOS
 .DS_Store
+
+# Build output
+dist/
+dist-ssr/
+*.local

@@ -12,14 +12,18 @@ import {
   HiOutlineArrowLeft,
   HiOutlineEye,
   HiOutlineEyeOff,
+  HiOutlineDownload,
 } from "react-icons/hi";
 import { FilesetResolver, FaceDetector, FaceLandmarker } from "@mediapipe/tasks-vision";
 import { analyzeAcneApi } from "../utils/api";
+import ReportModal from "../components/ReportModal";
+import { buildReportData, downloadReportPDF } from "../utils/reportGenerator";
 
 const AcneAnalysis = () => {
   const navigate = useNavigate();
 
   const [currentStep, setCurrentStep] = useState("instructions");
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const videoRef = useRef(null);
   const [stream, setStream] = useState(null);
@@ -762,12 +766,40 @@ const AcneAnalysis = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-between gap-4 pt-4 border-t border-[#E8DFD8]">
-                <button onClick={handleRetake} className="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-xl border border-[#E8DFD8] bg-white text-[#5A524C] hover:text-[#2B2623] hover:border-[#DC926E] transition-all cursor-pointer"><HiOutlineRefresh /><span>Retake</span></button>
-                <button onClick={handlePrintReport} className="inline-flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl bg-[#DC926E] hover:bg-[#c87e5b] text-white shadow-sm transition-all cursor-pointer"><HiOutlineDocumentReport className="text-sm" /><span>Save Report</span></button>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-[#E8DFD8]">
+                <button onClick={handleRetake} className="inline-flex items-center justify-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-xl border border-[#E8DFD8] bg-white text-[#5A524C] hover:text-[#2B2623] hover:border-[#DC926E] transition-all cursor-pointer">
+                  <HiOutlineRefresh /><span>Retake Scan</span>
+                </button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                  <button
+                    onClick={() => {
+                      if (!analysisResult) return;
+                      const report = buildReportData({ source: "acne-analysis", analysisResult, capturedImage });
+                      downloadReportPDF(report);
+                    }}
+                    className="inline-flex items-center justify-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl border border-[#DC926E] text-[#DC926E] hover:bg-[#FAF1EC] transition-all cursor-pointer"
+                  >
+                    <HiOutlineDownload className="text-sm" /><span>Download PDF (.pdf)</span>
+                  </button>
+                  <button
+                    onClick={() => setShowReportModal(true)}
+                    className="inline-flex items-center justify-center gap-2 text-xs font-bold px-5 py-2.5 rounded-xl bg-[#DC926E] hover:bg-[#c87e5b] text-white shadow-sm transition-all cursor-pointer"
+                  >
+                    <HiOutlineDocumentReport className="text-sm" /><span>View &amp; Print Clinical Report</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
+        )}
+
+        {/* Clinical Report Preview & Print Modal */}
+        {analysisResult && (
+          <ReportModal
+            isOpen={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            reportData={buildReportData({ source: "acne-analysis", analysisResult, capturedImage })}
+          />
         )}
 
       </div>

@@ -7,7 +7,7 @@ import axios from 'axios';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const AI_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000';
+const AI_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8008';
 
 let isStarting = false;
 
@@ -23,7 +23,7 @@ export async function checkAIServerHealth() {
 export async function ensureAIServerRunning() {
   const healthy = await checkAIServerHealth();
   if (healthy) {
-    console.log('[AI Manager] Python AI microservice is online on port 8000.');
+    console.log('[AI Manager] Python AI microservice is online on port 8008.');
     return true;
   }
 

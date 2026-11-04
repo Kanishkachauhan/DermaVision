@@ -228,7 +228,8 @@ def analyze_full_skin(req: FullSkinRequest):
         raise HTTPException(status_code=500, detail=f"Full-skin diagnostic error: {str(e)}")
 
 def run():
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=False, log_level="info")
+    port = int(os.environ.get("AI_PORT", 8008))
+    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False, log_level="info")
 
 if __name__ == "__main__":
     run()

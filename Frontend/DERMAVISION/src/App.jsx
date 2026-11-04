@@ -9,6 +9,7 @@ import FindDermatologists from "./pages/FindDermatologists";
 import Products from "./pages/Products";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { useLocation } from "react-router-dom";
 
@@ -63,7 +64,9 @@ const App = () => (
           element={
             <ProtectedRoute message="Please log in to access AI Skin Analysis.">
               <MainLayout>
-                <SkinAnalysis />
+                <ErrorBoundary>
+                  <SkinAnalysis />
+                </ErrorBoundary>
               </MainLayout>
             </ProtectedRoute>
           }
@@ -74,7 +77,9 @@ const App = () => (
           element={
             <ProtectedRoute message="Please log in to access AI Skin Analysis.">
               <MainLayout>
-                <SkinAnalysis />
+                <ErrorBoundary>
+                  <SkinAnalysis />
+                </ErrorBoundary>
               </MainLayout>
             </ProtectedRoute>
           }

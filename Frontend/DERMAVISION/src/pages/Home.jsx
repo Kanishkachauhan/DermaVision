@@ -13,6 +13,8 @@ import {
   HiOutlineAdjustments
 } from 'react-icons/hi';
 import { Link } from 'react-router-dom';
+import ReportModal from '../components/ReportModal';
+import { buildReportData, downloadReportPDF } from '../utils/reportGenerator';
 
 // Import marquee images
 import scanUiImg from '../assets/dermavision_scan_ui_1789367756914.jpg';
@@ -25,6 +27,7 @@ const Home = () => {
   const [activePreset, setActivePreset] = useState('acne_pores');
   const [isScanning, setIsScanning] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Clinic Search State
   const [searchLocation, setSearchLocation] = useState('');
@@ -180,10 +183,18 @@ const Home = () => {
 
   const handleDownloadReport = () => {
     setDownloadingReport(true);
-    setTimeout(() => {
-      setDownloadingReport(false);
-      alert("DermaVision Skin Health Report downloaded successfully! (Sample PDF generated with AI Confidence Scores and Care Guidelines)");
-    }, 1500);
+    try {
+      const presetData = scanPresets[activePreset];
+      const report = buildReportData({
+        source: 'home-preset',
+        preset: presetData,
+      });
+      downloadReportPDF(report, `DermaVision_Report_${activePreset}.pdf`);
+    } catch (err) {
+      console.error('Report download failed:', err);
+    } finally {
+      setTimeout(() => setDownloadingReport(false), 600);
+    }
   };
 
   const faqs = [
@@ -551,14 +562,23 @@ const Home = () => {
                   </p>
                 </div>
 
-                <button
-                  onClick={handleDownloadReport}
-                  disabled={downloadingReport}
-                  className="w-full sm:w-auto bg-[#2B2623] hover:bg-[#423C38] text-white text-xs font-semibold px-4 py-2.5 rounded-md flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
-                >
-                  <HiOutlineDownload className="text-sm text-[#DC926E]" />
-                  <span>{downloadingReport ? 'Generating PDF...' : 'Download Report'}</span>
-                </button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <button
+                    onClick={() => setShowReportModal(true)}
+                    className="w-full sm:w-auto bg-white hover:bg-[#FAF1EC] text-[#2B2623] border border-[#DC926E] text-xs font-semibold px-3.5 py-2 rounded-md flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                  >
+                    <HiOutlineDocumentReport className="text-sm text-[#DC926E]" />
+                    <span>Preview Clinical Report</span>
+                  </button>
+                  <button
+                    onClick={handleDownloadReport}
+                    disabled={downloadingReport}
+                    className="w-full sm:w-auto bg-[#2B2623] hover:bg-[#423C38] text-white text-xs font-semibold px-4 py-2 rounded-md flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <HiOutlineDownload className="text-sm text-[#DC926E]" />
+                    <span>{downloadingReport ? 'Generating PDF...' : 'Download PDF'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Detected Concerns */}
@@ -752,6 +772,16 @@ const Home = () => {
           </div>
         </div>
       </section>
+
+      {/* Clinical Report Preview Modal */}
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        reportData={buildReportData({
+          source: 'home-preset',
+          preset: scanPresets[activePreset],
+        })}
+      />
 
     </div>
   );
