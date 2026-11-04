@@ -1,20 +1,117 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import Registergirl from '../assets/registergirl.jpg';
-import { FcGoogle } from "react-icons/fc";
 import { FaApple } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
+import { apiRequest } from "../utils/api";
 
 const UserRegister = () => {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, googleLogin } = useAuth();
 
+  const googleButtonRef = useRef(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [googleClientId, setGoogleClientId] = useState("");
+  const [googleConfigLoading, setGoogleConfigLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    apiRequest("/auth/google/client-id")
+      .then((data) => {
+        if (!cancelled) setGoogleClientId(data.clientId || "");
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || "Google sign-up is unavailable.");
+      })
+      .finally(() => {
+        if (!cancelled) setGoogleConfigLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!googleClientId || !googleButtonRef.current) return undefined;
+
+    let cancelled = false;
+    const scriptId = "google-identity-services";
+    let script = document.getElementById(scriptId);
+    let resizeObserver;
+    const initializeGoogleSignIn = () => {
+      if (cancelled || !window.google?.accounts?.id || !googleButtonRef.current) return;
+
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: async ({ credential }) => {
+          setLoading(true);
+          setError("");
+          try {
+            await googleLogin(credential);
+            navigate("/home", { replace: true });
+          } catch (err) {
+            setError(err.message || "Google sign-up failed. Please try again.");
+          } finally {
+            setLoading(false);
+          }
+        },
+      });
+
+      let lastWidth = 0;
+      const renderGoogleButton = () => {
+        const width = Math.min(400, Math.floor(googleButtonRef.current?.clientWidth || 0));
+        if (!width || width === lastWidth || cancelled) return;
+
+        lastWidth = width;
+        googleButtonRef.current.replaceChildren();
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          type: "standard",
+          theme: "outline",
+          size: "large",
+          text: "signup_with",
+          shape: "rectangular",
+          width,
+        });
+      };
+
+      resizeObserver = new ResizeObserver(renderGoogleButton);
+      resizeObserver.observe(googleButtonRef.current);
+      renderGoogleButton();
+    };
+    const handleScriptError = () => {
+      if (!cancelled) setError("Google sign-in could not load. Please try again later.");
+    };
+
+    if (window.google?.accounts?.id) {
+      initializeGoogleSignIn();
+    } else {
+      if (!script) {
+        script = document.createElement("script");
+        script.id = scriptId;
+        script.src = "https://accounts.google.com/gsi/client";
+        script.async = true;
+        script.defer = true;
+      }
+
+      script.addEventListener("load", initializeGoogleSignIn);
+      script.addEventListener("error", handleScriptError);
+      if (!script.isConnected) document.head.appendChild(script);
+    }
+
+    return () => {
+      cancelled = true;
+      script?.removeEventListener("load", initializeGoogleSignIn);
+      script?.removeEventListener("error", handleScriptError);
+      resizeObserver?.disconnect();
+    };
+  }, [googleClientId, googleLogin, navigate]);
 
   const handleRegister = async (e) => {
     if (e) e.preventDefault();
@@ -177,15 +274,21 @@ const UserRegister = () => {
             {/* OAuth Buttons */}
             <div className="space-y-3">
 
-              <button
-                type="button"
-                onClick={() => navigate("/home")}
-                className="w-full border border-[#EFCAAD] bg-white hover:bg-[#FFF5F0] py-3 rounded-xl flex items-center justify-center gap-3 text-[#46352F] font-medium transition cursor-pointer"
-              >
-                <span className="font-bold text-lg"><FcGoogle />
-</span>
-                Continue with Google
-              </button>
+              {googleClientId ? (
+                <div
+                  ref={googleButtonRef}
+                  className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-[#EFCAAD] bg-white py-3 text-[#46352F] transition hover:bg-[#FFF5F0]"
+                  aria-label="Sign up with Google"
+                />
+              ) : googleConfigLoading ? (
+                <p className="text-center text-xs text-gray-500">
+                  Loading Google sign-up…
+                </p>
+              ) : (
+                <p className="text-center text-xs text-gray-500">
+                  Google sign-up is unavailable until it is configured.
+                </p>
+              )}
 
               <button
                 type="button"

@@ -9,6 +9,7 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 import authRoutes    from './routes/authRoutes.js';
 import analysisRoutes from './routes/analysisRoutes.js';
 import doctorRoutes  from './routes/doctorRoutes.js';
+import productRoutes from './routes/productRoutes.js';
 
 
 
@@ -39,6 +40,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth',     authRoutes);
 app.use('/api/analysis', analysisRoutes);
 app.use('/api/doctors',  doctorRoutes);
+app.use('/api/products', productRoutes);
 
 
 app.use(notFound);

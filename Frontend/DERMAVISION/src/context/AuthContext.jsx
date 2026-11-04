@@ -1,5 +1,5 @@
 // src/context/AuthContext.jsx
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useCallback, useContext, useState } from "react";
 import { apiRequest } from "../utils/api";
 
 const AuthContext = createContext(null);
@@ -41,6 +41,27 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   };
+
+  const googleLogin = useCallback(async (credential) => {
+    setLoading(true);
+    try {
+      const data = await apiRequest("/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ credential }),
+      });
+
+      if (data.accessToken && data.user) {
+        setToken(data.accessToken);
+        setUser(data.user);
+        localStorage.setItem("dermavision_token", data.accessToken);
+        localStorage.setItem("dermavision_user", JSON.stringify(data.user));
+      }
+
+      return data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   // Register
   const register = async (name, email, password) => {
@@ -96,6 +117,7 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated: !!token && !!user,
         loading,
         login,
+        googleLogin,
         register,
         verifyOtp,
         logout,

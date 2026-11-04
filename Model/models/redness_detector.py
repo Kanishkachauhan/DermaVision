@@ -579,9 +579,16 @@ class RednessDetector:
                 baseline_a = float(np.median(skin_a))
                 sigma_base = 2.5
 
+        # Protect against bangs, hair fringe, or lighting shadows on the forehead skewing baseline artificially low
+        skin_p30 = float(np.percentile(skin_a, 30))
+        if baseline_a < (skin_p30 - 3.0):
+            baseline_a = skin_p30
+            sub_base = skin_a[skin_a <= skin_p30]
+            sigma_base = max(1.5, float(np.std(sub_base))) if len(sub_base) > 5 else 2.5
+
         # 5. Differential Erythema Calculation (Delta a*)
-        # Adaptive threshold: 1.75 sigma above baseline, with a physiological minimum of 4.2
-        delta_threshold = max(4.2, 1.75 * sigma_base)
+        # Adaptive clinical threshold: accounts for normal physiological skin tone variance
+        delta_threshold = max(5.5, 2.0 * sigma_base)
 
         delta_a = np.zeros_like(a_star)
         delta_a[skin_mask] = np.maximum(0.0, a_star[skin_mask] - baseline_a)
@@ -623,8 +630,9 @@ class RednessDetector:
                 z_area_pct = 0.0
                 r_mean, g_mean, b_mean = 180, 150, 140
 
-            # Calibrated Zone Score & Severity (0-100 scale: Low <= 33, Moderate 34-66, High >= 67)
-            z_score = int(np.clip(z_delta_a * 8.5 + z_area_pct * 1.8, 5, 98))
+            # Calibrated Zone Score: normal physiological cheek perfusion (Delta a* <= 2.8) remains in Low tier
+            excess_zone_delta = max(0.0, z_delta_a - 2.8)
+            z_score = int(np.clip(excess_zone_delta * 6.8 + z_area_pct * 1.3 + 5, 5, 98))
             if z_score <= 33:
                 z_sev = "Low"
                 z_status = "Baseline Vascular Tone"
@@ -656,16 +664,18 @@ class RednessDetector:
             zone_redness.get("nose", {}).get("deltaErythemaIndex", 0)
         )
 
-        s_intensity = min(100.0, max(0.0, (cheek_nose_delta / 8.0) * 100.0))
-        s_area = min(100.0, max(0.0, (redness_percentage / 30.0) * 100.0))
-        s_vit = min(100.0, max(0.0, ((redness_confidence - 0.15) / 0.30) * 100.0))
+        clinical_delta = max(0.0, cheek_nose_delta - 2.8)
+        s_intensity = min(100.0, max(0.0, (clinical_delta / 7.2) * 100.0))
+        clinical_area = max(0.0, redness_percentage - 2.5)
+        s_area = min(100.0, max(0.0, (clinical_area / 25.0) * 100.0))
+        s_vit = min(100.0, max(0.0, ((redness_confidence - 0.18) / 0.32) * 100.0))
 
         weighted_zone_score = (
-            zone_redness.get("leftCheek", {}).get("score", 15) * 0.30 +
-            zone_redness.get("rightCheek", {}).get("score", 15) * 0.30 +
-            zone_redness.get("nose", {}).get("score", 15) * 0.20 +
-            zone_redness.get("forehead", {}).get("score", 15) * 0.10 +
-            zone_redness.get("chin", {}).get("score", 15) * 0.10
+            zone_redness.get("leftCheek", {}).get("score", 10) * 0.30 +
+            zone_redness.get("rightCheek", {}).get("score", 10) * 0.30 +
+            zone_redness.get("nose", {}).get("score", 10) * 0.20 +
+            zone_redness.get("forehead", {}).get("score", 10) * 0.10 +
+            zone_redness.get("chin", {}).get("score", 10) * 0.10
         )
 
         s_composite = (
@@ -675,13 +685,17 @@ class RednessDetector:
             0.15 * s_vit
         )
 
-        # Validated decision rule:
-        # Redness detected if physical affected area >= 7% OR localized flush >= 3.5 Delta a*
-        # OR ViT model strongly predicts skin redness (>= 0.35) with visible chromatic shift (>= 2.0)
+        # Calibrated decision rule:
+        # Requires true pathological elevation to distinguish from physiological flushing:
+        # 1. Broad affected area (>= 12%) with noticeable chromatic shift (>= 4.5 Delta a*)
+        # 2. Pronounced localized flush (>= 5.5 Delta a*) with at least 4% affected area
+        # 3. High acute flush (>= 7.0 Delta a*)
+        # 4. ViT strongly indicates skin redness (>= 0.38) with visible chromatic shift (>= 4.0)
         redness_detected = bool(
-            redness_percentage >= 7.0 or
-            cheek_nose_delta >= 3.5 or
-            (redness_confidence >= 0.35 and cheek_nose_delta >= 2.0)
+            (redness_percentage >= 12.0 and cheek_nose_delta >= 4.5) or
+            (cheek_nose_delta >= 5.5 and redness_percentage >= 4.0) or
+            (cheek_nose_delta >= 7.0) or
+            (redness_confidence >= 0.38 and cheek_nose_delta >= 4.0)
         )
 
         # Calibrated Severity Scale with Strict Monotonic Coupling:
@@ -689,11 +703,11 @@ class RednessDetector:
         # Tier 2 - Moderate (34–66): Reactive Capillary Flush
         # Tier 3 - High (67–100): Marked Vascular Erythema
         if not redness_detected:
-            final_score = int(np.clip(round(s_composite * 0.35), 5, 25))
+            final_score = int(np.clip(round(s_composite * 0.4), 5, 22))
             severity = "low"
             sev_label_compat = "Low"
         else:
-            final_score = int(np.clip(round(s_composite), 28, 98))
+            final_score = int(np.clip(round(s_composite), 30, 98))
             if final_score <= 33:
                 severity = "low"
                 sev_label_compat = "Low"
