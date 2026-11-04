@@ -2,9 +2,23 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import asyncHandler from 'express-async-handler';
+import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
 import sendEmail from '../utils/sendEmail.js';
 import { generateAccessToken, generateRefreshToken, hashToken } from '../utils/generateTokens.js';
+
+const googleAuthClient = new OAuth2Client();
+
+// @route GET /api/auth/google/client-id
+export const getGoogleClientId = (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    res.status(503);
+    throw new Error('Google sign-in is not configured on the server');
+  }
+
+  res.json({ success: true, clientId });
+};
 
 const issueTokens = async (res, user) => {
     console.log("User ID passed:", user._id);//
@@ -102,6 +116,77 @@ export const loginUser = asyncHandler(async (req, res) => {
   if (!user.isVerified) {
     res.status(403);
     throw new Error('Please verify your email before logging in');
+  }
+
+  const accessToken = await issueTokens(res, user);
+  res.json({ success: true, accessToken, user: user.toSafeObject() });
+});
+
+// @route POST /api/auth/google
+export const googleAuth = asyncHandler(async (req, res) => {
+  const { credential } = req.body;
+  if (!credential) {
+    res.status(400);
+    throw new Error('Google credential is required');
+  }
+
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    res.status(503);
+    throw new Error('Google sign-in is not configured on the server');
+  }
+
+  let payload;
+  try {
+    const ticket = await googleAuthClient.verifyIdToken({
+      idToken: credential,
+      audience: clientId,
+    });
+    payload = ticket.getPayload();
+  } catch {
+    res.status(401);
+    throw new Error('Google credential is invalid or expired');
+  }
+
+  if (!payload?.sub || !payload.email || payload.email_verified !== true) {
+    res.status(401);
+    throw new Error('A verified Google email is required');
+  }
+
+  let user = await User.findOne({ googleId: payload.sub }).select('+googleId +refreshTokenHash');
+  if (!user) {
+    user = await User.findOne({ email: payload.email.toLowerCase() }).select('+googleId +refreshTokenHash');
+
+    if (user?.googleId && user.googleId !== payload.sub) {
+      res.status(409);
+      throw new Error('This email is linked to a different Google account');
+    }
+    if (user && !user.isActive) {
+      res.status(403);
+      throw new Error('This account is inactive');
+    }
+
+    if (user) {
+      user.googleId = payload.sub;
+      user.isVerified = true;
+      await user.save();
+    } else {
+      const name = (payload.name?.trim() || payload.email.split('@')[0]).slice(0, 80);
+      user = await User.create({
+        name,
+        email: payload.email,
+        password: crypto.randomBytes(32).toString('hex'),
+        googleId: payload.sub,
+        avatarUrl: payload.picture || '',
+        isVerified: true,
+      });
+      user = await User.findById(user._id).select('+refreshTokenHash');
+    }
+  }
+
+  if (!user.isActive) {
+    res.status(403);
+    throw new Error('This account is inactive');
   }
 
   const accessToken = await issueTokens(res, user);

@@ -5,6 +5,8 @@ import {
   registerUser,
   verifyOtp,
   loginUser,
+  getGoogleClientId,
+  googleAuth,
   refreshAccessToken,
   logoutUser,
   forgotPassword,
@@ -16,6 +18,7 @@ import validateRequest from '../middleware/validateRequest.js';
 
 const router = express.Router();
 
+router.get('/google/client-id', getGoogleClientId);
 router.post(
   '/register',
   authLimiter,
@@ -30,6 +33,7 @@ router.post(
 
 router.post('/verify-otp', authLimiter, verifyOtp);
 router.post('/login', authLimiter, [body('email').isEmail(), body('password').notEmpty()], validateRequest, loginUser);
+router.post('/google', authLimiter, [body('credential').isString().notEmpty()], validateRequest, googleAuth);
 router.post('/refresh', refreshAccessToken);
 router.post('/logout', protect, logoutUser);
 router.post('/forgot-password', authLimiter, forgotPassword);
