@@ -81,7 +81,14 @@ export function buildReportData({
       rednessStatus = analysisResult.redness.status || "Localized cheek flushing";
     }
 
-    primaryConcern = `${darkCirclesLabel} under-eye circles & ${rednessLabel.toLowerCase()} cheek redness`;
+    if (analysisResult.acne) {
+      acneScore = Number(analysisResult.acne.acneScore ?? 24);
+      acneLabel = analysisResult.acne.acneSeverity?.label || (acneScore < 35 ? "Low" : acneScore <= 68 ? "Moderate" : "High");
+      poreScore = Number(analysisResult.acne.poreScore ?? 35);
+      poreLabel = analysisResult.acne.poreSeverity?.label || (poreScore < 35 ? "Minimal" : poreScore <= 68 ? "Medium" : "Enlarged");
+    }
+
+    primaryConcern = `${darkCirclesLabel} under-eye circles, ${rednessLabel.toLowerCase()} redness & ${acneLabel.toLowerCase()} acne`;
   }
 
   // If using AcneAnalysis result:

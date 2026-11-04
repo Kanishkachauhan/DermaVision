@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   HiChevronDown,
   HiArrowRight,
@@ -12,7 +12,7 @@ import {
   HiOutlineSearch,
   HiOutlineAdjustments
 } from 'react-icons/hi';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import ReportModal from '../components/ReportModal';
 import { buildReportData, downloadReportPDF } from '../utils/reportGenerator';
 
@@ -466,7 +466,8 @@ const Home = () => {
       </section>
 
       {/* SECTION 4: INTERACTIVE AI SKIN ANALYSIS SIMULATOR */}
-      <section id="analysis-simulator" className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12">
+      <section id="analysis-simulator" className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 scroll-mt-24">
+        <div id="scanner-demo" className="scroll-mt-24"></div>
         <div className="bg-white rounded-xl border border-[#E8DFD8] shadow-lg overflow-hidden p-4 sm:p-8 md:p-10 space-y-6 sm:space-y-8">
 
           {/* Header */}

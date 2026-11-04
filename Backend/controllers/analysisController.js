@@ -281,6 +281,8 @@ export const analyzeAcne = async (req, res, next) => {
         confidence:    aiData?.confidence ?? '96.8%',
         clinicalDescription: aiData?.clinicalDescription ?? null,
         device:        aiData?.device ?? null,
+        detectedSpots: aiData?.detectedSpots ?? [],
+        totalBlemishes: aiData?.totalBlemishes ?? (aiData?.detectedSpots ? aiData.detectedSpots.length : 0),
       },
     });
   } catch (error) {
