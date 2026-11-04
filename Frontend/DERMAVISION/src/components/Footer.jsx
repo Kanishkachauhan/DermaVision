@@ -2,6 +2,13 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
+  const handleScrollToSimulator = () => {
+    const elem = document.getElementById('analysis-simulator') || document.getElementById('scanner-demo');
+    if (elem) {
+      elem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
     <footer className="bg-[#2B2623] text-[#D8CFCA] pt-12 sm:pt-16 pb-8 sm:pb-12 border-t border-[#3D3734]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12">
@@ -37,6 +44,41 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
+                <Link
+                  to="/home#analysis-simulator"
+                  onClick={handleScrollToSimulator}
+                  className="hover:text-[#DC926E] transition-colors flex items-center gap-1.5"
+                >
+                  <span>Live Scan Simulator</span>
+                  <span className="text-[10px] bg-[#DC926E]/20 text-[#DC926E] px-1.5 py-0.2 rounded font-semibold">Demo</span>
+                </Link>
+              </li>
+              <li>
+                <Link to="/technology" className="hover:text-[#DC926E] transition-colors">
+                  Technology Engine
+                </Link>
+              </li>
+              <li>
+                <Link to="/how-it-works" className="hover:text-[#DC926E] transition-colors">
+                  How It Works
+                </Link>
+              </li>
+              <li>
+                <Link to="/faq" className="hover:text-[#DC926E] transition-colors">
+                  Frequently Asked Questions
+                </Link>
+              </li>
+              <li>
+                <Link to="/products" className="hover:text-[#DC926E] transition-colors">
+                  Recommended Products
+                </Link>
+              </li>
+              <li>
+                <Link to="/dermatologists" className="hover:text-[#DC926E] transition-colors">
+                  Find Dermatologists
+                </Link>
+              </li>
+              <li>
                 <Link to="/login" className="hover:text-[#DC926E] transition-colors">
                   User Login
                 </Link>
@@ -45,16 +87,6 @@ const Footer = () => {
                 <Link to="/register" className="hover:text-[#DC926E] transition-colors">
                   Create Account
                 </Link>
-              </li>
-              <li>
-                <a href="#technology" className="hover:text-[#DC926E] transition-colors">
-                  AI Vision Technology
-                </a>
-              </li>
-              <li>
-                <a href="#scanner-demo" className="hover:text-[#DC926E] transition-colors">
-                  Live Scanner Simulator
-                </a>
               </li>
             </ul>
           </div>

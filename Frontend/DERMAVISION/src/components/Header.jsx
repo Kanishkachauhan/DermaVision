@@ -29,10 +29,10 @@ const Header = () => {
     { name: "Home", href: "/home" },
     { name: "Products", href: "/products" },
     { name: "Skin Analysis", href: "/analysis" },
-    { name: "Technology", href: "#technology" },
-    { name: "How it Works", href: "#how-it-works" },
+    { name: "Technology", href: "/technology" },
+    { name: "How it Works", href: "/how-it-works" },
     { name: "Dermatologists", href: "/dermatologists" },
-    { name: "FAQ", href: "#faq" },
+    { name: "FAQ", href: "/faq" },
   ];
 
   return (
@@ -53,11 +53,15 @@ const Header = () => {
           {/* Desktop Navigation - active on lg screens (1024px+) to prevent tablet wrap */}
           <nav className="hidden lg:flex items-center gap-6 xl:gap-8 text-sm font-medium text-[#5A524C]">
             {navLinks.map((link) => (
-              link.href.startsWith("#") ? (
+              link.href.includes("#") ? (
                 <a
                   key={link.name}
                   href={link.href}
-                  className="hover:text-[#DC926E] transition-colors duration-200 py-1"
+                  className={`py-1 transition-colors duration-200 ${
+                    location.pathname === link.href
+                      ? "text-[#DC926E] font-semibold border-b-2 border-[#DC926E]"
+                      : "hover:text-[#DC926E]"
+                  }`}
                 >
                   {link.name}
                 </a>
@@ -65,7 +69,11 @@ const Header = () => {
                 <Link
                   key={link.name}
                   to={link.href}
-                  className="hover:text-[#DC926E] transition-colors duration-200 py-1"
+                  className={`py-1 transition-colors duration-200 ${
+                    location.pathname === link.href
+                      ? "text-[#DC926E] font-semibold border-b-2 border-[#DC926E]"
+                      : "hover:text-[#DC926E]"
+                  }`}
                 >
                   {link.name}
                 </Link>
@@ -128,11 +136,15 @@ const Header = () => {
           <div className="lg:hidden bg-[#FAF8F5] border-b border-[#E8DFD8] px-5 sm:px-8 py-5 space-y-4 max-h-[calc(100dvh-4rem)] sm:max-h-[calc(100dvh-5rem)] overflow-y-auto shadow-xl">
             <nav className="flex flex-col space-y-1">
               {navLinks.map((link) => (
-                link.href.startsWith("#") ? (
+                link.href.includes("#") ? (
                   <a
                     key={link.name}
                     href={link.href}
-                    className="text-[#5A524C] hover:text-[#DC926E] hover:bg-[#F5EBE6]/60 font-medium px-3 py-2.5 rounded-lg transition-colors text-sm"
+                    className={`font-medium px-3 py-2.5 rounded-lg transition-colors text-sm ${
+                      location.pathname === link.href
+                        ? "text-[#DC926E] bg-[#FAF1EC] font-semibold"
+                        : "text-[#5A524C] hover:text-[#DC926E] hover:bg-[#F5EBE6]/60"
+                    }`}
                     onClick={() => setMenuOpen(false)}
                   >
                     {link.name}
@@ -141,7 +153,11 @@ const Header = () => {
                   <Link
                     key={link.name}
                     to={link.href}
-                    className="text-[#5A524C] hover:text-[#DC926E] hover:bg-[#F5EBE6]/60 font-medium px-3 py-2.5 rounded-lg transition-colors text-sm"
+                    className={`font-medium px-3 py-2.5 rounded-lg transition-colors text-sm ${
+                      location.pathname === link.href
+                        ? "text-[#DC926E] bg-[#FAF1EC] font-semibold"
+                        : "text-[#5A524C] hover:text-[#DC926E] hover:bg-[#F5EBE6]/60"
+                    }`}
                     onClick={() => setMenuOpen(false)}
                   >
                     {link.name}

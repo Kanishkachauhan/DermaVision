@@ -4,6 +4,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import UserRegister from "./pages/UserRegister";
 import Home from "./pages/Home";
+import HowItWorks from "./pages/HowItWorks";
+import Technology from "./pages/Technology";
+import FAQ from "./pages/FAQ";
 import SkinAnalysis from "./pages/SkinAnalysis";
 import FindDermatologists from "./pages/FindDermatologists";
 import Products from "./pages/Products";
@@ -57,6 +60,9 @@ const App = () => (
       <Routes>
         <Route path="/"                    element={<MainLayout><Home /></MainLayout>} />
         <Route path="/home"                element={<MainLayout><Home /></MainLayout>} />
+        <Route path="/how-it-works"        element={<MainLayout><HowItWorks /></MainLayout>} />
+        <Route path="/technology"         element={<MainLayout><Technology /></MainLayout>} />
+        <Route path="/faq"                 element={<MainLayout><FAQ /></MainLayout>} />
         <Route path="/products"            element={<MainLayout><Products /></MainLayout>} />
         <Route path="/product"             element={<Navigate to="/products" replace />} />
         <Route

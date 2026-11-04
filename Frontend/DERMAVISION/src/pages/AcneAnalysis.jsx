@@ -295,18 +295,19 @@ const AcneAnalysis = () => {
 
   const calculateAcneTelemetry = async (img, landmarks) => {
     const canvas = document.createElement("canvas");
-    canvas.width = img.naturalWidth || img.width;
-    canvas.height = img.naturalHeight || img.height;
+    canvas.width = Math.min(640, img.naturalWidth || img.width || 640);
+    canvas.height = Math.min(640, img.naturalHeight || img.height || 640);
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    ctx.drawImage(img, 0, 0);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     const w = canvas.width, h = canvas.height;
 
-    const foreheadIndices   = [10, 67, 109, 151, 338, 297, 332, 284];
-    const noseBridgeIndices = [1, 2, 5, 4, 6, 195, 197, 19, 94];
-    const leftCheekIndices  = [234, 93, 132, 58, 172, 136, 150, 149, 176, 148, 152];
-    const rightCheekIndices = [454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152];
-    const chinIndices       = [152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 199, 200, 175, 396, 369, 395, 394, 377, 400];
-    const noseTipIndices    = [1, 2, 5, 4, 354, 370, 461, 457, 459, 309, 460, 289, 392, 391, 393, 164, 125, 141, 242];
+    const zoneDefinitions = {
+      forehead:   [10, 67, 109, 151, 338, 297, 332, 284],
+      leftCheek:  [234, 93, 132, 58, 172, 136, 150, 149, 176, 148, 152],
+      rightCheek: [454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152],
+      chin:       [152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 199, 200, 175],
+      nose:       [1, 2, 5, 4, 6, 195, 197, 19, 94],
+    };
 
     const getBox = (indices, padX = 0.02, padY = 0.02) => {
       const pts = indices.map((i) => landmarks[i] || { x: 0.5, y: 0.5 });
@@ -324,12 +325,11 @@ const AcneAnalysis = () => {
       };
     };
 
-    const foreheadBox   = getBox(foreheadIndices,   0.03, 0.04);
-    const noseBox       = getBox(noseBridgeIndices, 0.02, 0.02);
-    const leftCheekBox  = getBox(leftCheekIndices,  0.02, 0.015);
-    const rightCheekBox = getBox(rightCheekIndices, 0.02, 0.015);
-    const chinBox       = getBox(chinIndices,        0.02, 0.02);
-    const noseTipBox    = getBox(noseTipIndices,     0.015, 0.01);
+    const foreheadBox   = getBox(zoneDefinitions.forehead, 0.03, 0.04);
+    const noseBox       = getBox(zoneDefinitions.nose, 0.02, 0.02);
+    const leftCheekBox  = getBox(zoneDefinitions.leftCheek, 0.02, 0.015);
+    const rightCheekBox = getBox(zoneDefinitions.rightCheek, 0.02, 0.015);
+    const chinBox       = getBox(zoneDefinitions.chin, 0.02, 0.02);
 
     const cropPatch = (box) => {
       try {
@@ -340,64 +340,186 @@ const AcneAnalysis = () => {
       } catch (_) { return null; }
     };
 
-    const analyzeRegion = (box) => {
-      try {
-        const cW = Math.min(box.pixelW, w - box.pixelX);
-        const cH = Math.min(box.pixelH, h - box.pixelY);
-        if (cW <= 0 || cH <= 0) return { meanL: 128, varianceL: 0, rmsG: 0 };
-        const data = ctx.getImageData(box.pixelX, box.pixelY, cW, cH).data;
-        const count = data.length / 4;
-        let sumL = 0, sumG = 0;
-        for (let i = 0; i < data.length; i += 4) {
-          sumL += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-          sumG += data[i + 1];
+    // Baseline skin chromaticity from forehead
+    let baseRedContrast = 15.0;
+    try {
+      const fData = ctx.getImageData(foreheadBox.pixelX, foreheadBox.pixelY, foreheadBox.pixelW, foreheadBox.pixelH).data;
+      let rSum = 0, gSum = 0, bSum = 0, count = 0;
+      for (let i = 0; i < fData.length; i += 16) {
+        if (fData[i] > 35 && fData[i] < 240) {
+          rSum += fData[i]; gSum += fData[i + 1]; bSum += fData[i + 2]; count++;
         }
-        const meanL = sumL / count, meanG = sumG / count;
-        let varL = 0, rmsG = 0;
-        for (let i = 0; i < data.length; i += 4) {
-          varL += (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2] - meanL) ** 2;
-          rmsG += (data[i + 1] - meanG) ** 2;
+      }
+      if (count > 0) baseRedContrast = (rSum / count) - ((gSum + bSum) / (2 * count));
+    } catch (_) {}
+
+    const zoneAcne = {};
+    const detectedSpots = [];
+    let totalBlemishes = 0;
+
+    for (const [zoneKey, indices] of Object.entries(zoneDefinitions)) {
+      const box = getBox(indices);
+      const bw = Math.min(box.pixelW, w - box.pixelX);
+      const bh = Math.min(box.pixelH, h - box.pixelY);
+      if (bw < 16 || bh < 16) {
+        zoneAcne[zoneKey] = 14;
+        continue;
+      }
+
+      const imgData = ctx.getImageData(box.pixelX, box.pixelY, bw, bh);
+      const pixels = imgData.data;
+
+      const step = Math.max(5, Math.floor(Math.min(bw, bh) / 18));
+      const coreR = 2;
+      const ringR = 5;
+      const candidates = [];
+
+      for (let cy = ringR; cy < bh - ringR; cy += step) {
+        for (let cx = ringR; cx < bw - ringR; cx += step) {
+          let coreRed = 0, coreLum = 0, coreCount = 0;
+          let ringRed = 0, ringLum = 0, ringCount = 0;
+
+          for (let dy = -ringR; dy <= ringR; dy++) {
+            for (let dx = -ringR; dx <= ringR; dx++) {
+              const px = cx + dx;
+              const py = cy + dy;
+              const idx = (py * bw + px) * 4;
+              const r = pixels[idx];
+              const g = pixels[idx + 1];
+              const b = pixels[idx + 2];
+              const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+              if (lum < 35 || lum > 242) continue;
+
+              const redContrast = r - (g + b) / 2;
+
+              if (Math.abs(dx) <= coreR && Math.abs(dy) <= coreR) {
+                coreRed += redContrast; coreLum += lum; coreCount++;
+              } else {
+                ringRed += redContrast; ringLum += lum; ringCount++;
+              }
+            }
+          }
+
+          if (coreCount >= 8 && ringCount >= 22) {
+            const avgCoreRed = coreRed / coreCount;
+            const avgRingRed = ringRed / ringCount;
+            const avgCoreLum = coreLum / coreCount;
+            const avgRingLum = ringLum / ringCount;
+
+            const deltaRed = avgCoreRed - avgRingRed;
+            const deltaDark = avgRingLum - avgCoreLum;
+
+            const isPapule = deltaRed > 17.0 && (avgCoreRed - baseRedContrast > 10.0);
+            const isComedone = deltaDark > 22.0 && deltaRed < 8.0;
+
+            if (isPapule || isComedone) {
+              const strength = isPapule ? deltaRed : deltaDark;
+              candidates.push({
+                cx, cy,
+                type: isPapule ? "papule" : "comedone",
+                severity: strength > 27.0 ? "High" : "Moderate",
+                strength,
+              });
+            }
+          }
         }
-        return { meanL, varianceL: varL / count, rmsG: Math.sqrt(rmsG / count) };
-      } catch (_) { return { meanL: 128, varianceL: 0, rmsG: 0 }; }
-    };
+      }
 
-    const foreheadStats   = analyzeRegion(foreheadBox);
-    const leftCheekStats  = analyzeRegion(leftCheekBox);
-    const rightCheekStats = analyzeRegion(rightCheekBox);
-    const chinStats       = analyzeRegion(chinBox);
-    const noseStats       = analyzeRegion(noseBox);
-    const noseTipStats    = analyzeRegion(noseTipBox);
+      candidates.sort((a, b) => b.strength - a.strength);
+      const suppressed = [];
+      const minDistSq = 14 * 14;
+      for (const cand of candidates) {
+        let tooClose = false;
+        for (const existing of suppressed) {
+          const dSq = (cand.cx - existing.cx) ** 2 + (cand.cy - existing.cy) ** 2;
+          if (dSq < minDistSq) { tooClose = true; break; }
+        }
+        if (!tooClose) {
+          suppressed.push(cand);
+          if (suppressed.length >= 5) break;
+        }
+      }
 
-    const zones = [foreheadStats, leftCheekStats, rightCheekStats, chinStats, noseStats];
-    const avgVariance = zones.reduce((s, z) => s + z.varianceL, 0) / zones.length;
-    const poreRms = noseTipStats.rmsG;
+      const spotCount = suppressed.length;
+      totalBlemishes += spotCount;
 
-    const acneScore = Math.min(95, Math.max(10, Math.round((avgVariance / 480) * 100)));
-    const poreScore = Math.min(95, Math.max(10, Math.round(((poreRms - 5) / 30) * 100)));
+      let zScore = 14;
+      if (spotCount === 1) zScore = 24;
+      else if (spotCount === 2) zScore = 38;
+      else if (spotCount === 3) zScore = 52;
+      else if (spotCount >= 4) zScore = Math.min(88, 64 + (spotCount - 4) * 8);
+
+      zoneAcne[zoneKey] = zScore;
+
+      for (const s of suppressed) {
+        detectedSpots.push({
+          x: parseFloat(((box.pixelX + s.cx) / w * 100).toFixed(1)),
+          y: parseFloat(((box.pixelY + s.cy) / h * 100).toFixed(1)),
+          r: s.severity === "High" ? 2.4 : 1.9,
+          type: s.type,
+          severity: s.severity,
+          zone: zoneKey,
+        });
+      }
+    }
+
+    // Nasal pore micro-gradient
+    let poreScore = 28;
+    try {
+      const nw = Math.min(noseBox.pixelW, w - noseBox.pixelX);
+      const nh = Math.min(noseBox.pixelH, h - noseBox.pixelY);
+      if (nw > 10 && nh > 10) {
+        const nData = ctx.getImageData(noseBox.pixelX, noseBox.pixelY, nw, nh).data;
+        let diffSum = 0, count = 0;
+        for (let py = 1; py < nh - 1; py += 2) {
+          for (let px = 1; px < nw - 1; px += 2) {
+            const i = (py * nw + px) * 4;
+            const gCenter = nData[i + 1];
+            const gLeft = nData[i - 4 + 1];
+            const gRight = nData[i + 4 + 1];
+            diffSum += Math.abs(2 * gCenter - gLeft - gRight);
+            count++;
+          }
+        }
+        const avgGrad = count > 0 ? diffSum / count : 4.0;
+        poreScore = Math.min(88, Math.max(18, Math.round(16 + avgGrad * 3.4)));
+      }
+    } catch (_) {}
+
+    const weightedScore = Math.round(
+      (zoneAcne.forehead * 0.22) +
+      (zoneAcne.leftCheek * 0.28) +
+      (zoneAcne.rightCheek * 0.28) +
+      (zoneAcne.chin * 0.14) +
+      (zoneAcne.nose * 0.08)
+    );
+
+    const acneScore = Math.min(95, Math.max(10, weightedScore));
 
     const getSeverity = (val) => {
-      if (val < 35) return { label: "Low",    color: "#10B981", bg: "#ECFDF5", text: "text-emerald-700" };
-      if (val <= 68) return { label: "Medium", color: "#F59E0B", bg: "#FFFBEB", text: "text-amber-700"   };
-      return           { label: "High",   color: "#EF4444", bg: "#FEF2F2", text: "text-red-700"     };
+      if (val <= 33) return { label: "Low",      color: "#10B981", bg: "#ECFDF5", text: "text-emerald-700" };
+      if (val <= 66) return { label: "Moderate", color: "#F59E0B", bg: "#FFFBEB", text: "text-amber-700"   };
+      return                { label: "High",     color: "#EF4444", bg: "#FEF2F2", text: "text-red-700"     };
     };
 
-    const zoneAcne = {
-      forehead:   Math.min(95, Math.max(10, Math.round((foreheadStats.varianceL   / 480) * 100))),
-      leftCheek:  Math.min(95, Math.max(10, Math.round((leftCheekStats.varianceL  / 480) * 100))),
-      rightCheek: Math.min(95, Math.max(10, Math.round((rightCheekStats.varianceL / 480) * 100))),
-      chin:       Math.min(95, Math.max(10, Math.round((chinStats.varianceL        / 480) * 100))),
-      nose:       Math.min(95, Math.max(10, Math.round((noseStats.varianceL        / 480) * 100))),
-    };
+    let acneType = "Clear / Minimal Follicular Blemishes";
+    let treatment = "Gentle pH-balanced foaming cleanser, Niacinamide 2-5% serum, lightweight non-comedogenic barrier hydration & daily SPF 50+";
+    if (acneScore > 66) {
+      acneType = "Inflammatory (Papulopustular Acne Burden)";
+      treatment = "Benzoyl Peroxide 2.5–5%, Topical Retinoid (PM), Azelaic Acid 10–15%, Barrier Ceramide Cream; Consult Dermatologist";
+    } else if (acneScore > 33) {
+      acneType = "Mixed (Comedonal + Mild Inflammatory Papules)";
+      treatment = "Salicylic Acid (BHA 2%), Adapalene 0.1% Gel (PM), Niacinamide 10%, oil-free non-comedogenic hydration";
+    }
 
-    let acneType  = "Non-Inflammatory (Blackheads / Closed Comedones)";
-    let treatment = "BHA (Salicylic Acid 2%), Niacinamide 10%, Clay Mask";
-    if (acneScore > 68)      { acneType = "Inflammatory (Papules / Pustules / Nodules)"; treatment = "Benzoyl Peroxide 2.5–5%, Topical Retinoid, Azelaic Acid"; }
-    else if (acneScore > 40) { acneType = "Mixed (Comedonal + Mild Inflammatory)";       treatment = "Adapalene 0.1% Gel, Niacinamide, SPF 50+ Sunscreen";      }
-
-    let poreType = "Minimal Pore Dilation", poreTreatment = "Hydration + SPF; Retinol 0.025% (maintenance)";
-    if (poreScore > 68)      { poreType = "Enlarged Pores (Sebaceous Hyperplasia)"; poreTreatment = "Retinol 0.5–1%, AHA Exfoliant, Niacinamide 10%"; }
-    else if (poreScore > 35) { poreType = "Moderately Dilated Pores";               poreTreatment = "BHA Toner, Niacinamide Serum, weekly AHA peel"; }
+    let poreType = "Minimal Pore Dilation", poreTreatment = "Daily Gentle Hydration + Mineral SPF 50; Retinol 0.025% maintenance";
+    if (poreScore > 66) {
+      poreType = "Enlarged Pores (Sebaceous Hyperplasia)";
+      poreTreatment = "Retinol 0.5–1.0%, BHA 2% Toner, Zinc PCA, Clay Mask purification";
+    } else if (poreScore > 33) {
+      poreType = "Moderately Dilated Pores";
+      poreTreatment = "Salicylic Acid (BHA 2%) Toner, Niacinamide 10% Serum, Weekly gentle AHA exfoliation";
+    }
 
     const getPolygonPoints = (indices) =>
       indices.map((idx) => { const lm = landmarks[idx]; return lm ? `${(lm.x * 100).toFixed(2)},${(lm.y * 100).toFixed(2)}` : null; }).filter(Boolean).join(" ");
@@ -406,18 +528,31 @@ const AcneAnalysis = () => {
       acneScore, poreScore,
       acneSeverity: getSeverity(acneScore), poreSeverity: getSeverity(poreScore),
       acneType, treatment, poreType, poreTreatment, zoneAcne,
-      crops: { forehead: cropPatch(foreheadBox), leftCheek: cropPatch(leftCheekBox), noseTip: cropPatch(noseTipBox) },
+      totalBlemishes, detectedSpots,
+      crops: { forehead: cropPatch(foreheadBox), leftCheek: cropPatch(leftCheekBox), noseTip: cropPatch(noseBox) },
       regions: {
-        forehead:   getPolygonPoints(foreheadIndices)   || "30,12 35,10 50,10 65,12 62,20 50,22 38,20",
-        leftCheek:  getPolygonPoints(leftCheekIndices)  || "14,40 20,38 32,42 30,55 22,60 14,56",
-        rightCheek: getPolygonPoints(rightCheekIndices) || "86,40 72,38 68,42 70,55 78,60 86,56",
-        chin:       getPolygonPoints(chinIndices)        || "38,72 50,70 62,72 60,80 50,82 40,80",
-        noseTip:    getPolygonPoints(noseTipIndices)    || "44,46 50,44 56,46 56,54 50,56 44,54",
+        forehead:   getPolygonPoints(zoneDefinitions.forehead)   || "30,12 35,10 50,10 65,12 62,20 50,22 38,20",
+        leftCheek:  getPolygonPoints(zoneDefinitions.leftCheek)  || "14,40 20,38 32,42 30,55 22,60 14,56",
+        rightCheek: getPolygonPoints(zoneDefinitions.rightCheek) || "86,40 72,38 68,42 70,55 78,60 86,56",
+        chin:       getPolygonPoints(zoneDefinitions.chin)        || "38,72 50,70 62,72 60,80 50,82 40,80",
+        noseTip:    getPolygonPoints(zoneDefinitions.nose)        || "44,46 50,44 56,46 56,54 50,56 44,54",
       },
     };
 
     try {
-      await analyzeAcneApi({ acneScore, poreScore, zoneAcne, acneType, treatment, poreType, poreTreatment, crops: payload.crops, regions: payload.regions });
+      const serverRes = await analyzeAcneApi({ image: canvas.toDataURL("image/jpeg", 0.92), ...payload });
+      if (serverRes?.success && serverRes?.data && !serverRes.data.error) {
+        const d = serverRes.data;
+        return {
+          timestamp: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          ...payload,
+          ...d,
+          acneSeverity: getSeverity(d.acneScore ?? payload.acneScore),
+          poreSeverity: getSeverity(d.poreScore ?? payload.poreScore),
+          detectedSpots: d.detectedSpots?.length ? d.detectedSpots : payload.detectedSpots,
+          totalBlemishes: d.totalBlemishes ?? payload.totalBlemishes,
+        };
+      }
     } catch (_) { console.log("Running client-side ML mode."); }
 
     return { timestamp: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), ...payload };
