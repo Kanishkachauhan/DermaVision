@@ -14,6 +14,7 @@ This project combines **Artificial Intelligence, Computer Vision, and Full-Stack
 * 🧴 Personalized Skincare Product Recommendations
 * 📄 Skin Health Report Generation
 * 📍 Nearby Dermatologist Finder
+* 🩺 Admin-managed dermatologist profiles
 * 📈 Skin Progress Tracking & Analysis History
 
 ---
@@ -78,6 +79,18 @@ DermaVision/
 4. Build the React frontend.
 5. Integrate AI model with the web application.
 6. Test and deploy the complete system.
+
+## 🩺 Doctor Directory
+
+The public doctor listing is served from MongoDB at `GET /api/doctors` and contains active profiles only. Administrators with the existing `admin` user role can manage profiles at `/admin/doctors`; the API is protected by the existing JWT middleware. Admin accounts must be provisioned through a trusted process; public registration does not grant administrator privileges.
+
+To insert the initial Derma With Me profile, run this once from the `Backend` directory:
+
+```sh
+npm run seed:doctors
+```
+
+The seed command is idempotent and uses the configured `MONGO_URI`. Additional profiles can be managed from the admin page without frontend code changes.
 
 ---
 

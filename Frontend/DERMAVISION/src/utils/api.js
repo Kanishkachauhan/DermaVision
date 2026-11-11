@@ -48,6 +48,11 @@ export async function apiRequest(endpoint, options = {}) {
   }
 }
 
+export async function fetchActiveDoctorProfiles() {
+  const data = await apiRequest('/doctors');
+  return data.doctors || [];
+}
+
 /**
  * Send dark circle analysis to backend → forwarded to Python AI service
  */
@@ -352,4 +357,3 @@ export async function filterSkinImageApi(imagePayload) {
     body: JSON.stringify({ image: imagePayload }),
   });
 }
-

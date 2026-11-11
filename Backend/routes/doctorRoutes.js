@@ -4,8 +4,11 @@ import { query, body } from 'express-validator';
 import validateRequest from '../middleware/validateRequest.js';
 import { generalLimiter } from '../middleware/rateLimiter.js';
 import { getNearbyDoctors, enrichDoctors } from '../controllers/doctorController.js';
+import { getActiveDoctors } from '../controllers/doctorProfileController.js';
 
 const router = express.Router();
+
+router.get('/', generalLimiter, getActiveDoctors);
 
 /**
  * GET /api/doctors/nearby

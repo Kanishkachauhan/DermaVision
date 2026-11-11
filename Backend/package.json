@@ -9,6 +9,12 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "seed:doctors": "node scripts/seedDoctors.js",
+    "seed:products": "node scripts/seedProducts.js",
+    "cleanup:bioderma": "node scripts/cleanupBiodermaProducts.js",
+    "repair:product-images": "node scripts/repairProductImages.js",
+    "verify:products": "node scripts/verifyProducts.js",
+    "backfill:product-content": "node scripts/backfillProductContent.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

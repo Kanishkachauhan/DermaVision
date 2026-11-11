@@ -8,7 +8,7 @@ import {
   HiOutlineClock,
   HiCheckCircle,
 } from 'react-icons/hi';
-import { fetchOverpassDoctors } from '../utils/api';
+import { fetchActiveDoctorProfiles, fetchOverpassDoctors } from '../utils/api';
 
 // ─── Leaflet Marker Icon Fix for Vite / React ─────────────────────────────────
 delete L.Icon.Default.prototype._getIconUrl;
@@ -19,6 +19,13 @@ L.Icon.Default.mergeOptions({
 });
 
 const BRAND_COLOR = '#DC926E';
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+}[character]));
 
 // ─── Custom Icons ─────────────────────────────────────────────────────────────
 const createDoctorIcon = (isSelected) => {
@@ -65,23 +72,56 @@ const DermatologistMap = () => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [directoryError, setDirectoryError] = useState('');
 
-  // ── 1. Fetch Dermatologists from Overpass API ──────────────────────────────
+  // ── 1. Fetch registered profiles and nearby OpenStreetMap results ─────────
   const fetchDoctors = useCallback(async (lat, lng) => {
     setLoading(true);
-    try {
-      const results = await fetchOverpassDoctors({ lat, lng, radius: 10000 });
-      // Filter primarily for dermatologists or skin specialists
-      const dermResults = results.filter(
-        (d) => d.isDermatologyConfirmed || d.category === 'Dermatologist'
-      );
-      // Fallback to all nearby clinics if no explicit dermatology tags exist
-      setDoctors(dermResults.length > 0 ? dermResults : results);
-    } catch (err) {
-      console.warn('[DermatologistMap] Fetch error:', err.message);
-    } finally {
-      setLoading(false);
+    const [profileResult, nearbyResult] = await Promise.allSettled([
+      fetchActiveDoctorProfiles(),
+      fetchOverpassDoctors({ lat, lng, radius: 10000 }),
+    ]);
+
+    const errors = [];
+    let registeredDoctors = [];
+    if (profileResult.status === 'fulfilled') {
+      registeredDoctors = profileResult.value.map((doctor) => ({
+        ...doctor,
+        id: `profile-${doctor._id}`,
+        name: doctor.doctorName,
+        clinicName: doctor.clinicName,
+        category: doctor.specialization,
+        isDermatologyConfirmed: true,
+        address: doctor.address,
+        phone: doctor.contactNumber,
+        openingHours: doctor.consultationTimings,
+        rating: doctor.rating,
+        totalRatings: doctor.totalReviews,
+        latitude: Number(doctor.latitude),
+        longitude: Number(doctor.longitude),
+        directionsUrl: doctor.latitude != null && doctor.longitude != null
+          ? `https://www.google.com/maps/dir/?api=1&destination=${doctor.latitude},${doctor.longitude}`
+          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(doctor.address)}`,
+        source: 'directory',
+        distance: null,
+      }));
+    } else {
+      errors.push(`Registered doctor profiles could not be loaded: ${profileResult.reason.message}`);
     }
+
+    let nearbyDoctors = [];
+    if (nearbyResult.status === 'fulfilled') {
+      const dermatologists = nearbyResult.value.filter(
+        (doctor) => doctor.isDermatologyConfirmed || doctor.category === 'Dermatologist'
+      );
+      nearbyDoctors = dermatologists.length > 0 ? dermatologists : nearbyResult.value;
+    } else {
+      errors.push(`Nearby OpenStreetMap results could not be loaded: ${nearbyResult.reason.message}`);
+    }
+
+    setDoctors([...registeredDoctors, ...nearbyDoctors]);
+    setDirectoryError(errors.join(' '));
+    setLoading(false);
   }, []);
 
   // ── 2. Load Fallback Location if Geolocation Fails ─────────────────────────
@@ -232,10 +272,12 @@ const DermatologistMap = () => {
             🩺 Dermatologist
           </span>
           <p style="margin:4px 0 2px;font-weight:800;font-size:13px;color:#2B2623;">
-            ${doctor.name}
+            ${escapeHtml(doctor.name)}
           </p>
-          ${doctor.address ? `<p style="margin:0 0 6px;font-size:11px;color:#7A7069;">📍 ${doctor.address}</p>` : ''}
+          ${doctor.clinicName ? `<p style="margin:0 0 4px;font-size:11px;color:#5A524C;font-weight:700;">${escapeHtml(doctor.clinicName)}</p>` : ''}
+          ${doctor.address ? `<p style="margin:0 0 6px;font-size:11px;color:#7A7069;">📍 ${escapeHtml(doctor.address)}</p>` : ''}
           ${doctor.distance !== null ? `<p style="margin:0 0 6px;font-size:11px;color:${BRAND_COLOR};font-weight:700;">📏 ${doctor.distance} km away</p>` : ''}
+          ${doctor.rating != null ? `<p style="margin:0 0 6px;font-size:11px;color:#A16207;font-weight:700;">★ ${escapeHtml(doctor.rating)} / 5 · ${escapeHtml(doctor.totalRatings)} reviews</p>` : ''}
           <a href="${doctor.directionsUrl}" target="_blank" rel="noopener noreferrer"
              style="display:block;margin-top:6px;text-align:center;background:${BRAND_COLOR};color:#ffffff;padding:6px 0;border-radius:8px;font-size:11px;font-weight:700;text-decoration:none;">
             🗺️ Get Directions
@@ -290,7 +332,9 @@ const DermatologistMap = () => {
             <div className="flex items-center gap-1.5 text-xs font-bold text-[#2B2623]">
               <HiCheckCircle className="text-base text-emerald-600 shrink-0" />
               <span>
-                Found {doctors.length} nearby dermatologist{doctors.length !== 1 ? 's' : ''} {userPos?.label ? `near ${userPos.label}` : ''}
+                Found {doctors.length} dermatologist{doctors.length !== 1 ? 's' : ''}
+                {doctors.some((doctor) => doctor.source === 'directory') ? ' including registered profiles' : ''}
+                {userPos?.label ? ` · Search location: ${userPos.label}` : ''}
               </span>
             </div>
           )}
@@ -305,6 +349,12 @@ const DermatologistMap = () => {
           <span>Refresh</span>
         </button>
       </div>
+
+      {directoryError && (
+        <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
+          {directoryError}
+        </div>
+      )}
 
       {/* ── Main Map & Doctor List ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
@@ -348,7 +398,7 @@ const DermatologistMap = () => {
               <div className="bg-white border border-[#E8DFD8] rounded-2xl p-6 text-center space-y-2">
                 <div className="text-3xl">🩺</div>
                 <h4 className="text-sm font-bold text-[#2B2623]">No dermatologists found nearby</h4>
-                <p className="text-xs text-[#7A7069]">No clinics were recorded in OpenStreetMap within 10 km.</p>
+                <p className="text-xs text-[#7A7069]">No active registered profiles or nearby healthcare listings were found.</p>
               </div>
             )}
 
@@ -377,9 +427,22 @@ const DermatologistMap = () => {
                       )}
                     </div>
 
+                    {doctor.profileImage && (
+                      <img
+                        src={doctor.profileImage}
+                        alt={doctor.name}
+                        className="mb-2 h-16 w-16 rounded-xl object-cover"
+                        loading="lazy"
+                      />
+                    )}
+
                     <h4 className="text-sm font-bold text-[#2B2623] leading-snug line-clamp-2 mb-1">
                       {doctor.name}
                     </h4>
+
+                    {doctor.clinicName && (
+                      <p className="mb-1.5 text-xs font-semibold text-[#5A524C]">{doctor.clinicName}</p>
+                    )}
 
                     {doctor.address && (
                       <p className="text-xs text-[#7A7069] leading-relaxed mb-2 line-clamp-2">
@@ -389,6 +452,12 @@ const DermatologistMap = () => {
 
                     {/* Contact & Hours */}
                     <div className="space-y-1.5 text-xs text-[#5A524C]">
+                      {doctor.rating != null && (
+                        <div className="font-semibold text-amber-700">
+                          ★ {doctor.rating} / 5 <span className="font-normal text-[#7A7069]">({doctor.totalRatings} reviews)</span>
+                        </div>
+                      )}
+
                       {doctor.openingHours && (
                         <div className="flex items-center gap-1.5 text-[#5A524C]">
                           <HiOutlineClock className="text-sm text-[#7A7069] flex-shrink-0" />
@@ -398,12 +467,12 @@ const DermatologistMap = () => {
 
                       {doctor.phone && (
                         <a
-                          href={`tel:${doctor.phone}`}
+                          href={`tel:${doctor.phone.replace(/[^\d+]/g, '')}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1.5 font-semibold text-[#2B2623] hover:text-[#DC926E] transition-colors"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#E8DFD8] bg-white px-3 py-2 font-semibold text-[#2B2623] transition-colors hover:border-[#DC926E] hover:text-[#DC926E]"
                         >
                           <HiOutlinePhone className="text-sm text-[#DC926E] flex-shrink-0" />
-                          <span>{doctor.phone}</span>
+                          <span>Call Now · {doctor.phone}</span>
                         </a>
                       )}
 
