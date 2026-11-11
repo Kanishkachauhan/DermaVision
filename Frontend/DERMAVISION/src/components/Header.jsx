@@ -34,6 +34,9 @@ const Header = () => {
     { name: "Dermatologists", href: "/dermatologists" },
     { name: "FAQ", href: "/faq" },
   ];
+  const displayedNavLinks = user?.role === "admin"
+    ? [...navLinks, { name: "Manage Doctors", href: "/admin/doctors" }]
+    : navLinks;
 
   return (
     <>
@@ -52,7 +55,7 @@ const Header = () => {
 
           {/* Desktop Navigation - active on lg screens (1024px+) to prevent tablet wrap */}
           <nav className="hidden lg:flex items-center gap-6 xl:gap-8 text-sm font-medium text-[#5A524C]">
-            {navLinks.map((link) => (
+            {displayedNavLinks.map((link) => (
               link.href.includes("#") ? (
                 <a
                   key={link.name}
@@ -135,7 +138,7 @@ const Header = () => {
         {menuOpen && (
           <div className="lg:hidden bg-[#FAF8F5] border-b border-[#E8DFD8] px-5 sm:px-8 py-5 space-y-4 max-h-[calc(100dvh-4rem)] sm:max-h-[calc(100dvh-5rem)] overflow-y-auto shadow-xl">
             <nav className="flex flex-col space-y-1">
-              {navLinks.map((link) => (
+              {displayedNavLinks.map((link) => (
                 link.href.includes("#") ? (
                   <a
                     key={link.name}

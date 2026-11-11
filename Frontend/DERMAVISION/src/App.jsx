@@ -10,6 +10,8 @@ import FAQ from "./pages/FAQ";
 import SkinAnalysis from "./pages/SkinAnalysis";
 import FindDermatologists from "./pages/FindDermatologists";
 import Products from "./pages/Products";
+import ProductDetails from "./pages/ProductDetails";
+import AdminDoctors from "./pages/AdminDoctors";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -54,6 +56,26 @@ const ProtectedRoute = ({ children, message }) => {
   return children;
 };
 
+const AdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5]">
+        <div className="w-10 h-10 border-4 border-[#DC926E] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location, message: "Please sign in with an administrator account." }} replace />;
+  }
+
+  if (user?.role !== "admin") return <Navigate to="/" replace />;
+  return children;
+};
+
 const App = () => (
   <AuthProvider>
     <BrowserRouter>
@@ -64,6 +86,17 @@ const App = () => (
         <Route path="/technology"         element={<MainLayout><Technology /></MainLayout>} />
         <Route path="/faq"                 element={<MainLayout><FAQ /></MainLayout>} />
         <Route path="/products"            element={<MainLayout><Products /></MainLayout>} />
+        <Route path="/products/:productId" element={<MainLayout><ProductDetails /></MainLayout>} />
+        <Route
+          path="/admin/doctors"
+          element={
+            <AdminRoute>
+              <MainLayout>
+                <AdminDoctors />
+              </MainLayout>
+            </AdminRoute>
+          }
+        />
         <Route path="/product"             element={<Navigate to="/products" replace />} />
         <Route
           path="/analysis"

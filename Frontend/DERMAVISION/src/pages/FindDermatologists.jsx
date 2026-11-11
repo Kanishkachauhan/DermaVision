@@ -24,7 +24,7 @@ const FindDermatologists = () => {
         <div className="relative z-10 max-w-3xl space-y-3">
           <div className="inline-flex items-center gap-2 bg-[#DC926E]/15 border border-[#DC926E]/30 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold text-[#DC926E] uppercase tracking-wider">
             <HiOutlineLocationMarker className="text-sm shrink-0" />
-            <span>OpenStreetMap Healthcare Directory</span>
+            <span>DermaVision Dermatologist Directory</span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#2B2623] tracking-tight leading-tight">
@@ -32,8 +32,8 @@ const FindDermatologists = () => {
           </h1>
 
           <p className="text-xs sm:text-sm md:text-base text-[#7A7069] leading-relaxed">
-            Locate certified skin specialists, dermatology clinics, and healthcare centers in your vicinity.
-            Powered exclusively by free community data from OpenStreetMap.
+            Browse active dermatologist profiles managed by DermaVision alongside nearby community listings from OpenStreetMap.
+            Contact clinics directly or open turn-by-turn directions to their location.
           </p>
 
           <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-1 sm:pt-2">
@@ -47,7 +47,7 @@ const FindDermatologists = () => {
             </div>
             <div className="flex items-center gap-1.5 text-xs font-semibold text-[#5A524C]">
               <span className="text-sm">🗺️</span>
-              <span>OpenStreetMap Routing</span>
+              <span>Map Directions</span>
             </div>
           </div>
         </div>
