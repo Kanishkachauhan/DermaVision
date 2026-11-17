@@ -1,12 +1,41 @@
 {
   "variant": "B0",
-  "architecture": "EfficientNet-B0 Multi-Task",
+  "architecture": "EfficientNet-B0 Multi-Task Dermal Diagnostic Network",
   "checkpoint": "efficientnet_acne_b0.pth",
-  "total_samples": 342,
+  "training_samples": 252,
+  "validation_samples": 54,
+  "test_samples": 55,
   "target_size": 224,
   "epochs": 6,
-  "best_loss": 4.3118,
-  "final_mae": 11.07,
+  "best_val_loss": 35.6474,
+  "test_metrics": {
+    "loss": 26.9722,
+    "acne_mae": 36.18,
+    "pore_mae": 20.0,
+    "severity_accuracy": 0.1091,
+    "severity_f1_macro": 0.0656,
+    "severity_precision": 0.0364,
+    "severity_recall": 0.3333,
+    "subtype_accuracy": 0.6,
+    "subtype_f1_macro": 0.1875,
+    "confusion_matrix_severity": [
+      [
+        6,
+        0,
+        0
+      ],
+      [
+        18,
+        0,
+        0
+      ],
+      [
+        31,
+        0,
+        0
+      ]
+    ]
+  },
   "classes": {
     "severity": [
       "Low",
@@ -20,5 +49,7 @@
       "Vascular Erythema / Rosacea"
     ]
   },
-  "updated_at": "2026-09-29 14:09:18"
+  "temperature_calibration": 1.25,
+  "training_time_seconds": 401.65,
+  "updated_at": "2026-11-17 14:59:14"
 }

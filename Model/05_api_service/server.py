@@ -49,6 +49,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+def warmup_models():
+    print("[Server Startup] Pre-warming AI models in memory...")
+    try:
+        _ = get_engine("b0")
+        print("[Server Startup] EfficientNet-B0 & Pore detector initialized in memory.")
+    except Exception as e:
+        print(f"[Server Startup] Acne engine warmup warning: {e}")
+
 class AcneAnalysisRequest(BaseModel):
     image: Optional[str] = None
     variant: Optional[str] = "b0"  # "b0" or "b3"
