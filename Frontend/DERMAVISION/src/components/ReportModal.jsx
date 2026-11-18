@@ -157,19 +157,26 @@ const ReportModal = ({ isOpen, onClose, reportData }) => {
               {/* Left Column: User Face Photo (Baseline for Progress Tracking) */}
               <div className="md:col-span-4 flex flex-col bg-[#FAF8F5] rounded-2xl border-2 border-[#E8DFD8] overflow-hidden shadow-xs">
                 <div className="relative aspect-[4/5] w-full bg-slate-900 overflow-hidden flex items-center justify-center">
-                  {reportData.capturedImage ? (
-                    <img
-                      src={reportData.capturedImage}
-                      alt="Scanned Face Baseline"
-                      className="w-full h-full object-cover filter contrast-105"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-slate-400 p-4 text-center">
-                      <HiOutlineUser className="text-5xl text-slate-500 mb-2" />
-                      <span className="text-xs font-semibold">Face Baseline Photo</span>
-                      <span className="text-[10px] text-slate-500">Captured at scan</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const imgUrl = reportData.capturedImage || reportData.imageUrl;
+                    const isValidImg = imgUrl && !imgUrl.includes('placeholder');
+                    if (isValidImg) {
+                      return (
+                        <img
+                          src={imgUrl}
+                          alt="Scanned Face Baseline"
+                          className="w-full h-full object-cover filter contrast-105"
+                        />
+                      );
+                    }
+                    return (
+                      <div className="flex flex-col items-center justify-center text-slate-400 p-4 text-center">
+                        <HiOutlineUser className="text-5xl text-slate-500 mb-2" />
+                        <span className="text-xs font-semibold">Face Baseline Photo</span>
+                        <span className="text-[10px] text-slate-500">Captured at scan</span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Overlaid Badge */}
                   <div className="absolute top-2 left-2 bg-[#1E293B]/85 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">

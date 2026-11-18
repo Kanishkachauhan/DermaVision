@@ -312,10 +312,21 @@ const Reports = () => {
                       Full-Face Clinical Skin Assessment
                     </h3>
 
-                    {/* Detected Biomarkers Pills */}
+                    {/* Detected Biomarkers Pills (Acne and Pigmentation excluded per instruction) */}
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      {currentReport.predictions && currentReport.predictions.length > 0 ? (
-                        currentReport.predictions.map((p, idx) => (
+                      {(() => {
+                        const filtered = (currentReport.predictions || []).filter((p) => {
+                          const c = String(p.condition || '').toLowerCase();
+                          return !c.includes('acne') && !c.includes('blemish') && !c.includes('pigment');
+                        });
+                        if (filtered.length === 0) {
+                          return (
+                            <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg font-semibold">
+                              ✓ Balanced Homeostasis &amp; Targeted Cheek Care
+                            </span>
+                          );
+                        }
+                        return filtered.map((p, idx) => (
                           <span
                             key={idx}
                             className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${getConditionColor(p.severity)} flex items-center gap-1`}
@@ -324,12 +335,8 @@ const Reports = () => {
                             <span className="uppercase">{p.severity}</span>
                             <span className="text-[10px] opacity-75">({p.confidence}%)</span>
                           </span>
-                        ))
-                      ) : (
-                        <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg font-semibold">
-                          ✓ Balanced Homeostasis &amp; Barrier Maintenance
-                        </span>
-                      )}
+                        ));
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -460,20 +467,27 @@ const Reports = () => {
 
                           {/* Biomarkers summary */}
                           <div className="flex flex-wrap gap-1 pt-0.5">
-                            {report.predictions && report.predictions.length > 0 ? (
-                              report.predictions.slice(0, 3).map((p, pIdx) => (
+                            {(() => {
+                              const filtered = (report.predictions || []).filter((p) => {
+                                const c = String(p.condition || '').toLowerCase();
+                                return !c.includes('acne') && !c.includes('blemish') && !c.includes('pigment');
+                              });
+                              if (filtered.length === 0) {
+                                return (
+                                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                    Targeted Cheek Care
+                                  </span>
+                                );
+                              }
+                              return filtered.slice(0, 3).map((p, pIdx) => (
                                 <span
                                   key={pIdx}
                                   className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getConditionColor(p.severity)}`}
                                 >
                                   {p.condition}: {p.severity}
                                 </span>
-                              ))
-                            ) : (
-                              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                Healthy Barrier
-                              </span>
-                            )}
+                              ));
+                            })()}
                           </div>
                         </div>
                       </div>

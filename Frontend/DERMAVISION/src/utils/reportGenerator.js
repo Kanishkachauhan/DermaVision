@@ -159,7 +159,13 @@ export function buildReportData({
           pigmentationScore = sev === "High" ? 65 : sev === "Moderate" ? 42 : 18;
         }
       });
-      primaryConcern = dbReport.predictions.map((p) => `${p.severity} ${p.condition}`).join(", ");
+      const nonAcneConcerns = dbReport.predictions.filter((p) => {
+        const c = String(p.condition || "").toLowerCase();
+        return !c.includes("acne") && !c.includes("blemish") && !c.includes("pigment");
+      });
+      primaryConcern = nonAcneConcerns.length > 0
+        ? nonAcneConcerns.map((p) => `${p.severity} ${p.condition}`).join(", ")
+        : "Balanced skin barrier & cheek texture care";
     }
 
     if (dbReport.recommendations?.morningRoutine?.length) {
@@ -208,6 +214,7 @@ export function buildReportData({
     skinHealthScore,
     skinHealthGrade,
     capturedImage: finalCapturedImage,
+    imageUrl: finalCapturedImage,
     darkCircles: {
       score: darkCirclesScore,
       label: darkCirclesLabel,

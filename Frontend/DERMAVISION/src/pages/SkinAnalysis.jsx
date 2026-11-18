@@ -189,6 +189,62 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
   const [completingStepId, setCompletingStepId] = useState(null);
   const [toast, setToast] = useState(null);
 
+  // Fully resolved, reliable product list (guaranteed never empty if recommendation exists)
+  const resolvedProducts = React.useMemo(() => {
+    if (Array.isArray(recommendationData?.formattedProducts) && recommendationData.formattedProducts.length > 0) {
+      return recommendationData.formattedProducts;
+    }
+    if (Array.isArray(recommendationData?.selectedProducts) && recommendationData.selectedProducts.length > 0) {
+      return recommendationData.selectedProducts.map((sp) => {
+        const prod = (typeof sp.product === 'object' && sp.product) ? sp.product : {};
+        return {
+          productId: prod._id || prod.id || (typeof sp.product === 'string' ? sp.product : null),
+          name: prod.name || sp.stepName || 'Targeted Skincare Formulation',
+          brand: prod.brand || 'DermaVision Verified',
+          imageUrl: prod.imageUrl || '/product-placeholder.svg',
+          category: prod.category || sp.stepName || 'Treatment',
+          price: typeof prod.price === 'number' ? prod.price : null,
+          relevantConcern: sp.targetedConcerns?.[0] || 'Skin Barrier',
+          reason: sp.primaryReason,
+          ingredients: Array.isArray(prod.ingredients) ? prod.ingredients : (sp.matchedActives || []),
+          applicationInstructions: Array.isArray(prod.usageInstructions) ? prod.usageInstructions.join(' ') : (sp.usageTip || 'Apply as directed on product label.'),
+          warnings: prod.warnings || [],
+          productUrl: prod.productUrl || '',
+          matchScore: sp.matchScore || 85,
+          timeOfDay: sp.timeOfDay || 'both',
+        };
+      });
+    }
+    if (routineData?.morningRoutine || routineData?.eveningRoutine) {
+      const routineSteps = [...(routineData.morningRoutine || []), ...(routineData.eveningRoutine || [])];
+      const seenIds = new Set();
+      const prodsFromRoutine = [];
+      for (const step of routineSteps) {
+        const pId = step.product?._id || step.product || step.productName;
+        if (pId && !seenIds.has(String(pId))) {
+          seenIds.add(String(pId));
+          prodsFromRoutine.push({
+            productId: String(pId),
+            name: step.productName || step.product?.name || step.stepName,
+            brand: step.brand || step.product?.brand || 'DermaVision Recommended',
+            imageUrl: step.productImage || step.product?.imageUrl || '/product-placeholder.svg',
+            category: step.category || step.product?.category || 'Treatment',
+            price: typeof step.product?.price === 'number' ? step.product.price : null,
+            relevantConcern: 'Daily Barrier Care',
+            reason: step.applicationInstructions,
+            ingredients: step.activeIngredients || [],
+            applicationInstructions: step.applicationInstructions,
+            warnings: step.safetyWarnings || [],
+            matchScore: 90,
+            timeOfDay: step.frequency?.includes('AM') ? 'morning' : 'evening',
+          });
+        }
+      }
+      if (prodsFromRoutine.length > 0) return prodsFromRoutine;
+    }
+    return [];
+  }, [recommendationData, routineData]);
+
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
   };
@@ -633,7 +689,7 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
     return lms;
   };
 
-  const autoSaveScanReport = async (resObj) => {
+  const autoSaveScanReport = async (resObj, rawImg = null) => {
     try {
       const toStandardSeverity = (val, score) => {
         const s = String(val || '').toLowerCase();
@@ -712,7 +768,56 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
 
       setLoadingRecommendations(true);
 
-      const safeImageUrl = (capturedImage && capturedImage.length < 500000) ? capturedImage : '/scan-placeholder.jpg';
+      // Resolve actual captured face image (never dummy placeholder)
+      let sourceImg = rawImg || capturedImage || resObj?.capturedImage || resObj?.crops?.left || null;
+      if (!sourceImg && videoRef.current) {
+        try {
+          const v = videoRef.current;
+          const c = document.createElement("canvas");
+          c.width = v.videoWidth || 640;
+          c.height = v.videoHeight || 480;
+          const ctx = c.getContext("2d");
+          ctx.drawImage(v, 0, 0, c.width, c.height);
+          sourceImg = c.toDataURL("image/jpeg", 0.85);
+        } catch (_) {}
+      }
+
+      const compressForStorage = (dataUrl) => {
+        if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
+          return Promise.resolve(dataUrl);
+        }
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const maxDim = 800;
+            let width = img.width;
+            let height = img.height;
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.82));
+          };
+          img.onerror = () => resolve(dataUrl);
+          img.src = dataUrl;
+        });
+      };
+
+      const safeImageUrl = (await compressForStorage(sourceImg)) || sourceImg || '/scan-placeholder.jpg';
+      if (safeImageUrl && safeImageUrl !== '/scan-placeholder.jpg') {
+        setCapturedImage(safeImageUrl);
+        if (resObj) resObj.capturedImage = safeImageUrl;
+      }
 
       // ── Instant Fallback Helper: Always populates recommendations directly from catalog ──
       const fallbackToInstantEvaluation = async () => {
@@ -770,16 +875,26 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
             } catch (sErr) {
               console.warn('Today routine status note:', sErr.message);
             }
+          } else if (data.recommendation.morningRoutine || data.recommendation.eveningRoutine) {
+            setRoutineData({
+              _id: data.recommendation._id,
+              name: `Personalized ${calculatedSkinType} Regimen`,
+              skinType: calculatedSkinType,
+              status: 'active',
+              morningRoutine: data.recommendation.morningRoutine,
+              eveningRoutine: data.recommendation.eveningRoutine,
+              isActive: true,
+            });
           }
         } else {
           // If recommendation was deferred on backend, evaluate directly
           await fallbackToInstantEvaluation();
         }
 
-        // Fetch active routine to guarantee latest populated products
+        // Fetch active routine to guarantee latest populated products (only if it contains steps)
         try {
           const actRoutineRes = await fetchActiveRoutineApi();
-          if (actRoutineRes?.data) {
+          if (actRoutineRes?.data?.morningRoutine?.length || actRoutineRes?.data?.eveningRoutine?.length) {
             setRoutineData(actRoutineRes.data);
             const statusRes = await fetchTodayRoutineStatusApi(actRoutineRes.data._id);
             if (statusRes?.data) setTodayRoutineStatus(statusRes.data);
@@ -959,12 +1074,20 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
         qualityWarning,
       };
 
-      setAnalysisProgress(100);
-      setCurrentAnalysisStage("Step 8: Clinical diagnosis ready!");
-      await new Promise((r) => setTimeout(r, 200));
-
+      setAnalysisProgress(92);
+      setCurrentAnalysisStage("Step 8: Formulating personalized clinical regimen & routine...");
       setAnalysisResult(result);
-      autoSaveScanReport(result);
+
+      try {
+        await autoSaveScanReport(result, imageUrl);
+      } catch (autoErr) {
+        console.warn("Auto-save completed with fallback:", autoErr);
+      }
+
+      setAnalysisProgress(100);
+      setCurrentAnalysisStage("Clinical diagnosis & personalized regimen ready!");
+      await new Promise((r) => setTimeout(r, 150));
+
       if (scanFocus === "redness") {
         setActiveTab("redness");
       } else if (scanFocus === "acne") {
@@ -991,7 +1114,11 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
         qualityWarning: "Scan completed with calibrated optical telemetry.",
       };
       setAnalysisResult(safeResult);
-      autoSaveScanReport(safeResult);
+      try {
+        await autoSaveScanReport(safeResult, imageUrl);
+      } catch (autoErr) {
+        console.warn("Auto-save completed with fallback:", autoErr);
+      }
       setActiveTab("recommendations");
       setCurrentStep("report");
     }
@@ -3161,6 +3288,7 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                       onRemoveProduct={handleRemoveProduct}
                       onActivateRoutine={handleActivateRoutine}
                       completingStepId={completingStepId}
+                      loading={loadingRecommendations}
                     />
                   </div>
 
@@ -3184,28 +3312,7 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                     </div>
 
                     <RecommendedProductsSection
-                      products={
-                        recommendationData?.formattedProducts ||
-                        recommendationData?.selectedProducts?.map((sp) => {
-                          const prod = sp.product || {};
-                          return {
-                            productId: prod._id || prod.id,
-                            name: prod.name,
-                            brand: prod.brand,
-                            imageUrl: prod.imageUrl,
-                            category: prod.category,
-                            price: prod.price,
-                            relevantConcern: sp.targetedConcerns?.[0] || 'Skin Health',
-                            reason: sp.primaryReason,
-                            ingredients: prod.ingredients || [],
-                            applicationInstructions: prod.usageInstructions || sp.usageTip,
-                            warnings: prod.warnings || [],
-                            productUrl: prod.productUrl,
-                            matchScore: sp.matchScore,
-                            timeOfDay: sp.timeOfDay,
-                          };
-                        }) || []
-                      }
+                      products={resolvedProducts}
                       onSelectProduct={(p) => setSelectedProduct(p)}
                       loading={loadingRecommendations}
                     />

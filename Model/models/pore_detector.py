@@ -33,7 +33,10 @@ photographic resolution.
 import cv2
 import numpy as np
 from typing import Dict, Any, List, Tuple, Optional
-from skimage.feature import local_binary_pattern
+try:
+    from skimage.feature import local_binary_pattern
+except ImportError:
+    local_binary_pattern = None
 
 PORE_PROTOCOLS = {
     "low": {
