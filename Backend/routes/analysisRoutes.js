@@ -4,6 +4,7 @@ import {
   analyzeAcne,
   analyzeRedness,
   analyzePigmentation,
+  analyzePores,
   filterSkin,
   generateReportPdf,
 } from '../controllers/analysisController.js';
@@ -21,6 +22,9 @@ router.post('/redness', analyzeRedness);
 
 // POST /api/analysis/pigmentation (EfficientNet-B0 + CIELAB Melanin Engine)
 router.post('/pigmentation', analyzePigmentation);
+
+// POST /api/analysis/pores (Morphological Black Top-Hat on Cheek ROIs)
+router.post('/pores', analyzePores);
 
 // POST /api/analysis/filter (OpenCV skin filtering & illumination normalization)
 router.post('/filter', filterSkin);

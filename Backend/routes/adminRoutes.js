@@ -10,6 +10,16 @@ import {
   updateDoctor,
   updateDoctorStatus,
 } from '../controllers/doctorProfileController.js';
+import {
+  getProducts,
+  getProductById,
+  createProduct,
+  updateProduct,
+  updateProductStatus,
+  deleteProduct,
+  uploadProductImageAction,
+} from '../controllers/productController.js';
+import uploadProductImage from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -58,5 +68,14 @@ router.patch(
   validateRequest,
   updateDoctorStatus
 );
+
+// ─── ADMIN PRODUCT CATALOG MANAGEMENT ───────────────────────────────────────
+router.get('/products', getProducts);
+router.post('/products', createProduct);
+router.get('/products/:id', [param('id').isMongoId()], validateRequest, getProductById);
+router.put('/products/:id', [param('id').isMongoId()], validateRequest, updateProduct);
+router.patch('/products/:id/status', [param('id').isMongoId()], validateRequest, updateProductStatus);
+router.delete('/products/:id', [param('id').isMongoId()], validateRequest, deleteProduct);
+router.post('/products/upload-image', uploadProductImage.single('image'), uploadProductImageAction);
 
 export default router;

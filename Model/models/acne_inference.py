@@ -47,6 +47,14 @@ DermalPreprocessor = dermal_preproc_mod.DermalPreprocessor
 pore_mod = importlib.import_module("models.pore_detector")
 get_pore_detector = pore_mod.get_pore_detector
 
+try:
+    from models.pores_detector import get_pores_detector
+except ImportError:
+    try:
+        from pores_detector import get_pores_detector
+    except ImportError:
+        get_pores_detector = None
+
 
 CLINICAL_PROTOCOLS = {
     "Non-Inflammatory (Comedonal)": {
@@ -363,6 +371,20 @@ class AcneInferenceEngine:
 
         final_acne_score = max(8, min(95, final_acne_score))
 
+        # Dedicated cheek-only visible pores detection
+        pores_data = None
+        if get_pores_detector is not None:
+            try:
+                p_detector = get_pores_detector()
+                p_res = p_detector.analyze_pores(normalized_rgb, landmarks=landmarks, debug=True)
+                if p_res and p_res.get("pores"):
+                    pores_data = p_res["pores"]
+                    overall_metrics = pores_data.get("overall", {})
+                    if overall_metrics.get("visiblePoreDensity") is not None:
+                        final_pore_score = int(round(overall_metrics["visiblePoreDensity"]))
+            except Exception as p_err:
+                print(f"[AcneInferenceEngine] Cheek pores detector warning: {p_err}")
+
         # Severity classification
         if final_acne_score < 35:
             severity = {"label": "Low", "color": "#10B981", "bg": "#ECFDF5", "text": "text-emerald-700"}
@@ -387,6 +409,13 @@ class AcneInferenceEngine:
             "poreSeverity": pore_res["poreSeverity"],
             "poreType": pore_res["poreType"],
             "poreTreatment": pore_res["poreTreatment"],
+            "pores": pores_data or {
+                "leftCheek": {"visiblePoreDensity": None, "estimatedCount": None, "confidence": "uncertain"},
+                "rightCheek": {"visiblePoreDensity": None, "estimatedCount": None, "confidence": "uncertain"},
+                "overall": {"visiblePoreDensity": None, "estimatedCount": None, "confidence": "uncertain"},
+                "analyzedRegions": ["left_cheek", "right_cheek"],
+                "excludedRegions": ["nose", "forehead", "chin", "under_eye"]
+            },
             "zoneAcne": zone_scores,
             "zonePores": pore_res["zonePores"],
             "detectedSpots": detected_spots,

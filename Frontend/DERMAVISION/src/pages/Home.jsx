@@ -620,6 +620,17 @@ const Home = () => {
                 <span className="text-[#6B615B]">{scanPresets[activePreset].recommendedCare}</span>
               </div>
 
+              {/* Live Routine CTA */}
+              <div className="pt-1">
+                <Link
+                  to="/recommendations"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#2B2623] hover:bg-[#1E1B19] text-[#FAF8F5] text-xs font-semibold tracking-wide transition-all shadow-sm hover:shadow group"
+                >
+                  <span>Open Personalized Skincare Dashboard</span>
+                  <HiArrowRight className="w-4 h-4 text-[#DC926E] group-hover:translate-x-0.5 transition-transform" />
+                </Link>
+              </div>
+
             </div>
 
           </div>

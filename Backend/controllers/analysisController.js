@@ -283,6 +283,7 @@ export const analyzeAcne = async (req, res, next) => {
         device:        aiData?.device ?? null,
         detectedSpots: aiData?.detectedSpots ?? [],
         totalBlemishes: aiData?.totalBlemishes ?? (aiData?.detectedSpots ? aiData.detectedSpots.length : 0),
+        pores:         aiData?.pores ?? null,
       },
     });
   } catch (error) {
@@ -474,6 +475,40 @@ export const filterSkin = async (req, res, next) => {
 
     const aiRes = await aiClient.post('/api/filter/skin', { image });
     return res.status(200).json(aiRes.data);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─── Cheek Pores Telemetry Analysis ──────────────────────────────────────────
+export const analyzePores = async (req, res, next) => {
+  try {
+    const { image, landmarks, debug } = req.body;
+    if (!image) {
+      return res.status(400).json({ success: false, message: 'Image payload required.' });
+    }
+
+    try {
+      const aiRes = await aiClient.post('/api/analyze/pores', {
+        image,
+        landmarks: landmarks || null,
+        debug: Boolean(debug)
+      });
+      return res.status(200).json(aiRes.data);
+    } catch (aiErr) {
+      console.warn('[analysisController] Pores AI service unreachable:', aiErr.message);
+      return res.status(200).json({
+        success: true,
+        pores: {
+          leftCheek: { visiblePoreDensity: null, estimatedCount: null, confidence: 'uncertain' },
+          rightCheek: { visiblePoreDensity: null, estimatedCount: null, confidence: 'uncertain' },
+          overall: { visiblePoreDensity: null, estimatedCount: null, confidence: 'uncertain' },
+          analyzedRegions: ['left_cheek', 'right_cheek'],
+          excludedRegions: ['nose', 'forehead', 'chin', 'under_eye'],
+          diagnosticNote: 'AI pores microservice temporarily unreachable; fallback returned.'
+        }
+      });
+    }
   } catch (error) {
     next(error);
   }

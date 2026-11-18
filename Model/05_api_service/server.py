@@ -32,6 +32,9 @@ get_redness_detector = redness_module.get_redness_detector
 pigment_module = importlib.import_module("models.pigmentation_detector")
 get_pigmentation_detector = pigment_module.get_pigmentation_detector
 
+pores_module = importlib.import_module("models.pores_detector")
+get_pores_detector = pores_module.get_pores_detector
+
 cv_filters_mod = importlib.import_module("03_preprocessing.opencv_filters")
 preprocess_dermatology_pipeline = cv_filters_mod.preprocess_dermatology_pipeline
 HAS_OPENCV = cv_filters_mod.HAS_OPENCV
@@ -97,6 +100,11 @@ class PigmentationRequest(BaseModel):
     crops: Optional[Dict[str, Any]] = None
     pigmentationScore: Optional[float] = None
     zoneScores: Optional[Dict[str, Any]] = None
+
+class PoresAnalysisRequest(BaseModel):
+    image: str
+    landmarks: Optional[Any] = None
+    debug: Optional[bool] = False
 
 class FullSkinRequest(BaseModel):
     image: str
@@ -169,6 +177,7 @@ def health_check():
             "dark_circles": "MediaPipe Infraorbital CIELAB Telemetry",
             "redness": "ViT-FaceCharacteristics (varun1505/face-characteristics)",
             "pigmentation": "EfficientNet-B0 / EfficientNet-B3 + CIELAB Melanin Index",
+            "cheek_pores": "Morphological Black Top-Hat & Texture Telemetry (Cheek ROIs)",
             "device": device
         },
         "version": "2.2.0",
@@ -246,6 +255,15 @@ def analyze_pigmentation_endpoint(req: PigmentationRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Pigmentation analysis error: {str(e)}")
 
+@app.post("/api/analyze/pores")
+def analyze_pores_endpoint(req: PoresAnalysisRequest):
+    try:
+        detector = get_pores_detector()
+        result = detector.analyze_pores(req.image, landmarks=req.landmarks, debug=req.debug)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cheek pores analysis error: {str(e)}")
+
 @app.post("/api/analyze/full-skin")
 def analyze_full_skin(req: FullSkinRequest):
     try:
@@ -257,6 +275,8 @@ def analyze_full_skin(req: FullSkinRequest):
         redness_res = redness_det.analyze_face(req.image, landmarks=req.landmarks)
         pigment_det = get_pigmentation_detector(variant=variant)
         pigment_res = pigment_det.analyze_face(req.image, landmarks=req.landmarks)
+        pores_det = get_pores_detector()
+        pores_res = pores_det.analyze_pores(req.image, landmarks=req.landmarks, debug=True)
 
         return {
             "success": True,
@@ -265,7 +285,8 @@ def analyze_full_skin(req: FullSkinRequest):
                 "acne": acne_res,
                 "darkCircles": dark_circle_res,
                 "redness": redness_res,
-                "pigmentation": pigment_res
+                "pigmentation": pigment_res,
+                "pores": pores_res.get("pores")
             }
         }
     except Exception as e:
