@@ -158,6 +158,7 @@ export const getRecommendationById = asyncHandler(async (req, res) => {
 
 /**
  * @desc    Evaluate recommendations and AM/PM routine directly from scan diagnostics (Works for guests and offline preview)
+ *          When user is authenticated, persists the routine to MongoDB so step-completion ticks work.
  * @route   POST /api/recommendations/evaluate
  * @access  Public (Optional Auth)
  */
@@ -190,9 +191,20 @@ export const evaluatePreviewRecommendation = asyncHandler(async (req, res) => {
     options: { allergies, sensitivities, preferences },
   });
 
+  const mapStepKey = (name = '') => {
+    const n = name.toLowerCase();
+    if (n.includes('cleanse') || n.includes('wash')) return 'cleanse';
+    if (n.includes('tone')) return 'tone';
+    if (n.includes('eye')) return 'eye_care';
+    if (n.includes('sun')) return 'sunscreen';
+    if (n.includes('moistur') || n.includes('cream')) return 'moisturize';
+    return 'treat';
+  };
+
   const morningRoutineSteps = evaluation.morningRoutine.map((step) => ({
-    _id: step.product || new mongoose.Types.ObjectId(),
     stepNumber: step.stepOrder,
+    applicationOrder: step.stepOrder,
+    stepKey: mapStepKey(step.stepName),
     stepName: step.stepName,
     product: step.product,
     productName: step.productName,
@@ -206,8 +218,9 @@ export const evaluatePreviewRecommendation = asyncHandler(async (req, res) => {
   }));
 
   const eveningRoutineSteps = evaluation.eveningRoutine.map((step) => ({
-    _id: step.product || new mongoose.Types.ObjectId(),
     stepNumber: step.stepOrder,
+    applicationOrder: step.stepOrder,
+    stepKey: mapStepKey(step.stepName),
     stepName: step.stepName,
     product: step.product,
     productName: step.productName,
@@ -220,19 +233,75 @@ export const evaluatePreviewRecommendation = asyncHandler(async (req, res) => {
     isPaused: false,
   }));
 
-  const companionRoutine = {
-    _id: new mongoose.Types.ObjectId(),
-    name: `Personalized ${evaluation.diagnostics.skinType} Clinical Regimen`,
-    skinType: evaluation.diagnostics.skinType,
-    status: 'active',
-    timeOfApplication: 'daily',
-    morningRoutine: morningRoutineSteps,
-    eveningRoutine: eveningRoutineSteps,
-    instructions: 'Follow the numbered sequence. Allow 60 seconds between active layers for full absorption.',
-    frequency: 'Daily (AM & PM)',
-    durationWeeks: 6,
-    isActive: true,
-  };
+  // ── When authenticated: persist routine to MongoDB so completion ticks work ──
+  let companionRoutine;
+  if (req.user) {
+    try {
+      // Deactivate any previous active routine for this user
+      await SkincareRoutine.updateMany(
+        { user: req.user._id, isActive: true },
+        { $set: { isActive: false, status: 'archived' } }
+      );
+
+      const dbRoutine = new SkincareRoutine({
+        user: req.user._id,
+        name: `Personalized ${evaluation.diagnostics.skinType} Clinical Regimen`,
+        skinType: evaluation.diagnostics.skinType,
+        status: 'active',
+        activatedAt: new Date(),
+        timeOfApplication: 'daily',
+        morningRoutine: morningRoutineSteps,
+        eveningRoutine: eveningRoutineSteps,
+        instructions: 'Follow the numbered sequence. Allow 60 seconds between active layers.',
+        frequency: 'Daily (AM & PM)',
+        durationWeeks: 6,
+        isActive: true,
+      });
+
+      await dbRoutine.save();
+
+      // Re-fetch with populated product details
+      const populatedRoutine = await SkincareRoutine.findById(dbRoutine._id)
+        .populate('morningRoutine.product')
+        .populate('eveningRoutine.product')
+        .lean();
+
+      companionRoutine = populatedRoutine;
+    } catch (dbErr) {
+      console.warn('[evaluatePreviewRecommendation] DB save note:', dbErr.message);
+      // Fall back to in-memory routine
+      companionRoutine = {
+        _id: new mongoose.Types.ObjectId(),
+        name: `Personalized ${evaluation.diagnostics.skinType} Clinical Regimen`,
+        skinType: evaluation.diagnostics.skinType,
+        status: 'active',
+        timeOfApplication: 'daily',
+        morningRoutine: morningRoutineSteps,
+        eveningRoutine: eveningRoutineSteps,
+        instructions: 'Follow the numbered sequence.',
+        frequency: 'Daily (AM & PM)',
+        durationWeeks: 6,
+        isActive: true,
+        _isGuest: true,
+      };
+    }
+  } else {
+    // Guest: return in-memory routine with _isGuest flag
+    companionRoutine = {
+      _id: new mongoose.Types.ObjectId(),
+      name: `Personalized ${evaluation.diagnostics.skinType} Clinical Regimen`,
+      skinType: evaluation.diagnostics.skinType,
+      status: 'active',
+      timeOfApplication: 'daily',
+      morningRoutine: morningRoutineSteps,
+      eveningRoutine: eveningRoutineSteps,
+      instructions: 'Follow the numbered sequence.',
+      frequency: 'Daily (AM & PM)',
+      durationWeeks: 6,
+      isActive: true,
+      _isGuest: true,
+    };
+  }
 
   res.json({
     success: true,

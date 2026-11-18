@@ -471,13 +471,18 @@ export async function generatePersonalizedRecommendation({
   }
 
   // 11. Return populated recommendation with formatted products
+  //     Also populate morningRoutine.product and eveningRoutine.product INSIDE skincareRoutine
   const populated = await Recommendation.findById(recommendation._id)
     .populate('selectedProducts.product')
     .populate('morningRoutine.product')
     .populate('eveningRoutine.product')
     .populate({
       path: 'skincareRoutine',
-      populate: { path: 'orderedProducts.product' },
+      populate: [
+        { path: 'orderedProducts.product' },
+        { path: 'morningRoutine.product' },
+        { path: 'eveningRoutine.product' },
+      ],
     })
     .lean();
 

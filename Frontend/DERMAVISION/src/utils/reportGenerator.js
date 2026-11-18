@@ -10,8 +10,9 @@ export function buildReportData({
   user = null,
   capturedImage = null,
   preset = null,
+  dbReport = null,
 }) {
-  const now = new Date();
+  const now = dbReport?.createdAt ? new Date(dbReport.createdAt) : new Date();
   const dateStr = now.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -23,7 +24,9 @@ export function buildReportData({
   });
 
   const randomHex = Math.floor(10000 + Math.random() * 90000).toString(16).toUpperCase();
-  const reportId = `DV-2026-${randomHex}`;
+  const reportId = dbReport?._id 
+    ? `DV-${String(dbReport._id).slice(-8).toUpperCase()}` 
+    : `DV-2026-${randomHex}`;
 
   const patientName = user?.name || user?.fullName || "Guest Subject";
   const patientEmail = user?.email || "patient@dermavision.ai";
@@ -122,15 +125,75 @@ export function buildReportData({
     }
   }
 
+  // If using saved MongoDB Report document:
+  if (dbReport) {
+    scanType = "Dermal AI Clinical Report";
+    skinType = dbReport.skinType || skinType;
+    if (typeof dbReport.healthScore === "number") {
+      darkCirclesScore = 30;
+      rednessScore = 25;
+      acneScore = 20;
+      pigmentationScore = 20;
+    }
+
+    if (Array.isArray(dbReport.predictions) && dbReport.predictions.length > 0) {
+      dbReport.predictions.forEach((p) => {
+        const cond = String(p.condition || "").toLowerCase();
+        const sev = p.severity || "Moderate";
+        if (cond.includes("circle")) {
+          darkCirclesLabel = sev;
+          darkCirclesScore = sev === "High" ? 75 : sev === "Moderate" ? 50 : 25;
+          darkCirclesEtiology = "Periorbital shadow & vascular pooling";
+        } else if (cond.includes("redness") || cond.includes("erythema")) {
+          rednessLabel = sev;
+          rednessScore = sev === "High" ? 76 : sev === "Moderate" ? 48 : 22;
+          rednessStatus = "Vascular erythema / flushing";
+        } else if (cond.includes("acne") || cond.includes("blemish")) {
+          acneLabel = sev;
+          acneScore = sev === "High" ? 72 : sev === "Moderate" ? 52 : 24;
+        } else if (cond.includes("pore")) {
+          poreLabel = sev;
+          poreScore = sev === "High" ? 68 : sev === "Moderate" ? 48 : 26;
+        } else if (cond.includes("pigment")) {
+          pigmentationLabel = sev;
+          pigmentationScore = sev === "High" ? 65 : sev === "Moderate" ? 42 : 18;
+        }
+      });
+      primaryConcern = dbReport.predictions.map((p) => `${p.severity} ${p.condition}`).join(", ");
+    }
+
+    if (dbReport.recommendations?.morningRoutine?.length) {
+      amRoutine = dbReport.recommendations.morningRoutine.map((r, i) => ({
+        step: i + 1,
+        type: r.step || `Step ${i + 1}`,
+        product: r.product || "Clinical Formulation",
+        instruction: r.instructions || "Apply gently in the morning.",
+      }));
+    }
+    if (dbReport.recommendations?.nightRoutine?.length) {
+      pmRoutine = dbReport.recommendations.nightRoutine.map((r, i) => ({
+        step: i + 1,
+        type: r.step || `Step ${i + 1}`,
+        product: r.product || "Barrier Restoration Active",
+        instruction: r.instructions || "Apply before bedtime.",
+      }));
+    }
+  }
+
   // Overall Skin Health Score calculation (0-100, where higher is healthier)
-  const compositePenalty = Math.round((darkCirclesScore * 0.28) + (rednessScore * 0.26) + (acneScore * 0.24) + (pigmentationScore * 0.22));
-  const skinHealthScore = Math.max(35, Math.min(98, 100 - Math.round(compositePenalty * 0.65)));
+  let calculatedHealthScore = Math.max(35, Math.min(98, 100 - Math.round(
+    ((darkCirclesScore * 0.28) + (rednessScore * 0.26) + (acneScore * 0.24) + (pigmentationScore * 0.22)) * 0.65
+  )));
+  if (dbReport && typeof dbReport.healthScore === "number") {
+    calculatedHealthScore = dbReport.healthScore;
+  }
+  const skinHealthScore = calculatedHealthScore;
 
   let skinHealthGrade = "Optimal Condition";
   if (skinHealthScore < 60) skinHealthGrade = "Requires Gentle Care";
   else if (skinHealthScore < 80) skinHealthGrade = "Good (Mild Concern)";
 
-  const finalCapturedImage = capturedImage || analysisResult?.crops?.left || analysisResult?.capturedImage || null;
+  const finalCapturedImage = dbReport?.imageUrl || capturedImage || analysisResult?.crops?.left || analysisResult?.capturedImage || null;
 
   return {
     reportId,

@@ -1,5 +1,5 @@
 // src/components/recommendations/DailyRoutineSection.jsx
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   HiOutlineSun,
   HiOutlineMoon,
@@ -28,6 +28,9 @@ const DailyRoutineSection = ({
 }) => {
   const [activeTab, setActiveTab] = useState('morning'); // 'morning' | 'evening'
   const [showPatchTestModal, setShowPatchTestModal] = useState(false);
+  // Local completion state: used as a fallback when backend ticks fail (guest mode or in-memory routine)
+  const [localCompleted, setLocalCompleted] = useState({ morning: {}, evening: {} });
+  const [localProcessing, setLocalProcessing] = useState(null);
 
   if (!routine) {
     return (
@@ -44,23 +47,53 @@ const DailyRoutineSection = ({
   }
 
   const isDraft = routine.status === 'draft';
+  // Guest/in-memory routines have _isGuest flag: completions are tracked locally only
+  const isGuestRoutine = Boolean(routine._isGuest);
   const steps = activeTab === 'morning' ? routine.morningRoutine || [] : routine.eveningRoutine || [];
-  
-  // Calculate completion numbers
+
+  // Handle step click: optimistically toggle local state, then try backend sync
+  const handleStepClick = async (step) => {
+    if (step.isPaused) return;
+    const stepId = String(step._id);
+    // Optimistic local toggle
+    setLocalCompleted((prev) => ({
+      ...prev,
+      [activeTab]: {
+        ...prev[activeTab],
+        [stepId]: !prev[activeTab]?.[stepId],
+      },
+    }));
+    if (!isGuestRoutine && onCompleteStep) {
+      setLocalProcessing(stepId);
+      try {
+        await onCompleteStep(routine._id, activeTab, stepId);
+      } catch (err) {
+        // Keep local tick even if backend fails
+        console.warn('Step completion note:', err?.message);
+      } finally {
+        setLocalProcessing(null);
+      }
+    }
+  };
+
+  // Calculate completion numbers: prefer backend status, fallback to local state
+  const localTabCompleted = localCompleted[activeTab] || {};
+  const localCompletedCount = steps.filter((s) => !s.isPaused && localTabCompleted[String(s._id)]).length;
   const currentStatusObj = activeTab === 'morning' ? todayStatus?.morning : todayStatus?.evening;
-  const completedCount = currentStatusObj?.completedCount ?? 0;
+  const completedCount = currentStatusObj?.completedCount ?? localCompletedCount;
   const totalCount = currentStatusObj?.totalSteps ?? steps.filter((s) => !s.isPaused).length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const isAllDone = currentStatusObj?.isAllCompleted || (totalCount > 0 && completedCount >= totalCount);
 
-  // Status mapping for checkboxes
+  // Status mapping for checkboxes: check backend status first, then local state
   const isStepCompleted = (step) => {
+    const stepIdStr = String(step._id);
     if (activeTab === 'morning') {
-      const stepObj = todayStatus?.morning?.steps?.find((s) => String(s._id) === String(step._id));
-      return Boolean(stepObj?.isCompletedToday);
+      const stepObj = todayStatus?.morning?.steps?.find((s) => String(s._id) === stepIdStr);
+      return Boolean(stepObj?.isCompletedToday) || Boolean(localCompleted.morning?.[stepIdStr]);
     } else {
-      const stepObj = todayStatus?.evening?.steps?.find((s) => String(s._id) === String(step._id));
-      return Boolean(stepObj?.isCompletedToday);
+      const stepObj = todayStatus?.evening?.steps?.find((s) => String(s._id) === stepIdStr);
+      return Boolean(stepObj?.isCompletedToday) || Boolean(localCompleted.evening?.[stepIdStr]);
     }
   };
 
@@ -189,7 +222,8 @@ const DailyRoutineSection = ({
           {steps.map((step, idx) => {
             const completed = isStepCompleted(step);
             const isPaused = Boolean(step.isPaused);
-            const isProcessing = completingStepId === step._id;
+            const stepIdStr = String(step._id);
+            const isProcessing = completingStepId === stepIdStr || localProcessing === stepIdStr;
 
             return (
               <div
@@ -206,11 +240,7 @@ const DailyRoutineSection = ({
                 <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 flex-1">
                   {/* Completion Checkbox */}
                   <button
-                    onClick={() =>
-                      !isPaused &&
-                      onCompleteStep &&
-                      onCompleteStep(routine._id, activeTab, step._id)
-                    }
+                    onClick={() => !isPaused && handleStepClick(step)}
                     disabled={isPaused || isProcessing}
                     className={`mt-1 sm:mt-0 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer flex-shrink-0 ${
                       completed
