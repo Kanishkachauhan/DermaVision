@@ -82,6 +82,8 @@ const productSchema = new mongoose.Schema(
         'Face Mask',
         'FaceMask',
         'Treatment',
+        'Eye care',
+        'Eye Care',
       ],
       default: 'Treatment',
       required: true,
@@ -90,6 +92,7 @@ const productSchema = new mongoose.Schema(
     contentSource: { type: contentProvenanceSchema, default: () => ({}) },
     aiGeneratedContent: { type: aiGeneratedContentSchema, default: null },
     imageUrl: { type: String, default: '/product-placeholder.svg' },
+    imagePublicId: { type: String, default: '' },
     price: { type: Number, default: null, min: 0 },
     currency: { type: String, default: 'INR' },
     ingredients: { type: [ingredientSchema], default: [] },
@@ -98,10 +101,13 @@ const productSchema = new mongoose.Schema(
     benefits: { type: [String], default: [] },
     usageInstructions: { type: [String], default: [] },
     precautions: { type: [String], default: [] },
+    warnings: { type: [String], default: [] },
+    contraindications: { type: [String], default: [] },
     productSize: { type: String, default: '' },
     availability: { type: String, default: 'Information not available' },
     officialSourceUrl: { type: String, default: '' },
     buyLink: { type: String, default: '' },
+    productUrl: { type: String, default: '' },
     lastVerifiedAt: { type: Date, default: null },
     rating: { type: Number, min: 0, max: 5, default: 0 },
     isActive: { type: Boolean, default: true },
@@ -119,7 +125,10 @@ productSchema.pre('validate', function setCanonicalSlug() {
   if (!this.slug && this.brand && this.name) {
     this.slug = slugify(`${this.brand}-${this.name}`);
   }
+  if (!this.productUrl) {
+    this.productUrl = this.officialSourceUrl || this.buyLink || '';
+  }
 });
 
-const Product = mongoose.model('Product', productSchema);
+const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
 export default Product;

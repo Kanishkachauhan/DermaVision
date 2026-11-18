@@ -46,5 +46,5 @@ const reportSchema = new mongoose.Schema(
 
 reportSchema.index({ user: 1, createdAt: -1 });
 
-const Report = mongoose.model('Report', reportSchema);
+const Report = mongoose.models.Report || mongoose.model('Report', reportSchema);
 export default Report;

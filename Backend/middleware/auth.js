@@ -42,3 +42,28 @@ export const adminOnly = (req, res, next) => {
   res.status(403);
   throw new Error('Admin access required');
 };
+
+export const optionalAuth = asyncHandler(async (req, res, next) => {
+  let token;
+  const authHeader = req.headers.authorization;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  }
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (user && user.isActive) {
+      req.user = user;
+    }
+  } catch {
+    // Token is invalid/expired; proceed as unauthenticated guest
+  }
+
+  next();
+});

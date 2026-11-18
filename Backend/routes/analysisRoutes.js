@@ -3,6 +3,7 @@ import {
   analyzeDarkCircles,
   analyzeAcne,
   analyzeRedness,
+  analyzePores,
   filterSkin,
   generateReportPdf,
 } from '../controllers/analysisController.js';
@@ -17,6 +18,9 @@ router.post('/acne', analyzeAcne);
 
 // POST /api/analysis/redness (ViT face characteristics - varun1505/face-characteristics)
 router.post('/redness', analyzeRedness);
+
+// POST /api/analysis/pores (Morphological Black Top-Hat on Cheek ROIs)
+router.post('/pores', analyzePores);
 
 // POST /api/analysis/filter (OpenCV skin filtering & illumination normalization)
 router.post('/filter', filterSkin);

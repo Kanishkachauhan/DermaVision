@@ -17,12 +17,30 @@ import {
   HiOutlineExclamation,
   HiOutlineXCircle,
   HiOutlineDownload,
+  HiOutlineSparkles,
 } from "react-icons/hi";
 import { FilesetResolver, FaceDetector, FaceLandmarker } from "@mediapipe/tasks-vision";
-import { analyzeDarkCirclesApi, analyzeRednessApi, analyzeAcneApi } from "../utils/api";
+import {
+  analyzeDarkCirclesApi,
+  analyzeRednessApi,
+  analyzeAcneApi,
+  apiRequest,
+  fetchActiveRoutineApi,
+  fetchTodayRoutineStatusApi,
+  completeRoutineStepApi,
+  toggleProductPauseApi,
+  removeProductFromRoutineApi,
+  activateRoutineApi,
+  generateRecommendationsApi,
+  evaluateRecommendationsApi,
+} from "../utils/api";
 import DermatologistMap from "../components/DermatologistMap";
 import ReportModal from "../components/ReportModal";
 import { buildReportData, downloadReportPDF } from "../utils/reportGenerator";
+import RecommendedProductsSection from "../components/recommendations/RecommendedProductsSection";
+import DailyRoutineSection from "../components/recommendations/DailyRoutineSection";
+import ProductQuickViewModal from "../components/recommendations/ProductQuickViewModal";
+import ToastNotification from "../components/recommendations/ToastNotification";
 
 // ─── CONFIGURABLE ENGINEERING PARAMETERS FOR UNDER-EYE SEVERITY ───────────────
 export const DARK_CIRCLE_CONFIG = {
@@ -157,6 +175,138 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [isRetryingRedness, setIsRetryingRedness] = useState(false);
+  const [showPoresDebug, setShowPoresDebug] = useState(false);
+
+  // Instant Recommendations & Routine State (Single Scan to Complete Regimen)
+  const [savedReportId, setSavedReportId] = useState(null);
+  const [recommendationData, setRecommendationData] = useState(null);
+  const [routineData, setRoutineData] = useState(null);
+  const [todayRoutineStatus, setTodayRoutineStatus] = useState(null);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [completingStepId, setCompletingStepId] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
+
+  const handleExplicitRegenerate = async () => {
+    if (isRegenerating) return;
+    setIsRegenerating(true);
+    try {
+      if (savedReportId) {
+        const res = await generateRecommendationsApi({
+          reportId: savedReportId,
+          forceRegenerate: true,
+        });
+        if (res?.data) {
+          setRecommendationData(res.data);
+          showToast('Regimen updated based on your existing scan report!');
+          try {
+            const actRoutineRes = await fetchActiveRoutineApi();
+            if (actRoutineRes?.data) {
+              setRoutineData(actRoutineRes.data);
+              const statusRes = await fetchTodayRoutineStatusApi(actRoutineRes.data._id);
+              if (statusRes?.data) setTodayRoutineStatus(statusRes.data);
+            }
+          } catch (rErr) {
+            console.warn('Routine refresh note:', rErr.message);
+          }
+          return;
+        }
+      }
+
+      // If no savedReportId or offline, regenerate via evaluateRecommendationsApi
+      if (analysisResult) {
+        const circlesScore = Number(analysisResult.severityScore ?? 0);
+        const rednessScore = Number(analysisResult.redness?.redness_score ?? 0);
+        const acneScore = Number(analysisResult.acne?.acneScore ?? 0);
+        const poreScore = Number(analysisResult.acne?.poreScore ?? 0);
+
+        const evalRes = await evaluateRecommendationsApi({
+          diagnosticData: {
+            skinType: recommendationData?.diagnostics?.skinType || 'Combination',
+            healthScore: analysisResult.skinHealthScore || 78,
+            darkCirclesScore: circlesScore,
+            rednessScore: rednessScore,
+            acneScore: acneScore,
+            poreScore: poreScore,
+          },
+        });
+        if (evalRes?.data) {
+          setRecommendationData(evalRes.data);
+          if (evalRes.data.skincareRoutine) {
+            setRoutineData(evalRes.data.skincareRoutine);
+          }
+          showToast('Regimen refreshed based on your facial biomarkers!');
+        }
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to regenerate recommendations.', 'error');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const handleCompleteStep = async (routineId, timeOfDay, stepId) => {
+    setCompletingStepId(stepId);
+    try {
+      const res = await completeRoutineStepApi(routineId, { timeOfDay, stepId });
+      if (res?.success) {
+        showToast('Step completed for today! Regimen progress updated.');
+        const updatedStatus = await fetchTodayRoutineStatusApi(routineId);
+        if (updatedStatus?.data) {
+          setTodayRoutineStatus(updatedStatus.data);
+        }
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to record step completion.', 'error');
+    } finally {
+      setCompletingStepId(null);
+    }
+  };
+
+  const handleTogglePause = async (routineId, productId, isPaused) => {
+    try {
+      const res = await toggleProductPauseApi(routineId, productId, isPaused);
+      if (res?.success && res.data) {
+        setRoutineData(res.data);
+        showToast(`Product ${isPaused ? 'paused' : 'resumed'} in routine.`);
+        const updatedStatus = await fetchTodayRoutineStatusApi(routineId);
+        if (updatedStatus?.data) setTodayRoutineStatus(updatedStatus.data);
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to update product status.', 'error');
+    }
+  };
+
+  const handleRemoveProduct = async (routineId, productId) => {
+    try {
+      const res = await removeProductFromRoutineApi(routineId, productId);
+      if (res?.success && res.data) {
+        setRoutineData(res.data);
+        showToast('Product removed and remaining steps re-sequenced.');
+        const updatedStatus = await fetchTodayRoutineStatusApi(routineId);
+        if (updatedStatus?.data) setTodayRoutineStatus(updatedStatus.data);
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to remove product.', 'error');
+    }
+  };
+
+  const handleActivateRoutine = async (routineId) => {
+    try {
+      const res = await activateRoutineApi(routineId);
+      if (res?.success && res.data) {
+        setRoutineData(res.data);
+        showToast('Your personalized daily routine is now active!');
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to activate routine.', 'error');
+    }
+  };
 
   const handleRetryRednessAnalysis = async () => {
     if (!capturedImage || isRetryingRedness) return;
@@ -482,6 +632,174 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
     return lms;
   };
 
+  const autoSaveScanReport = async (resObj) => {
+    try {
+      const toStandardSeverity = (val, score) => {
+        const s = String(val || '').toLowerCase();
+        if (s.includes('high') || s.includes('severe') || Number(score) > 60) return 'High';
+        if (s.includes('mod') || Number(score) > 30) return 'Moderate';
+        return 'Low';
+      };
+
+      // ── Facial Biomarker Extraction (Accurate to user's real face) ──
+      const circlesScore = Number(resObj.severityScore ?? 0);
+      const rednessScore = Number(resObj.redness?.redness_score ?? 0);
+      const acneScore = Number(resObj.acne?.acneScore ?? 0);
+      const poreScore = Number(resObj.acne?.poreScore ?? 0);
+      const totalBlemishes = Number(resObj.acne?.totalBlemishes ?? 0);
+      const zoneAcne = resObj.acne?.zoneAcne || {};
+      const tZonePores = ((zoneAcne.forehead || 20) + (zoneAcne.nose || 25)) / 2;
+      const uZoneCheeks = ((zoneAcne.leftCheek || 15) + (zoneAcne.rightCheek || 15)) / 2;
+
+      // Classify true skin type from facial telemetry
+      let calculatedSkinType = 'Combination';
+      if (poreScore >= 50 || (acneScore >= 38 && poreScore >= 40)) {
+        calculatedSkinType = 'Oily';
+      } else if (poreScore < 28 && (rednessScore >= 35 || acneScore < 15)) {
+        calculatedSkinType = 'Dry';
+      } else if (tZonePores > uZoneCheeks + 5 || poreScore >= 36) {
+        calculatedSkinType = 'Combination';
+      } else {
+        calculatedSkinType = 'Normal';
+      }
+
+      // Calculate dynamic skin health score
+      const totalDeduction = (circlesScore * 0.25) + (rednessScore * 0.35) + (acneScore * 0.30) + (poreScore * 0.10);
+      const calculatedHealthScore = Math.max(35, Math.min(98, Math.round(100 - (totalDeduction * 0.55))));
+
+      // Only push concerns that are ACTUALLY elevated on this user's face
+      const predictions = [];
+      if (circlesScore > 28) {
+        predictions.push({
+          condition: 'Dark Circles',
+          confidence: Math.round(Number(resObj.detectionConfidence || 0.88) * 100),
+          severity: toStandardSeverity(resObj.severityCategory, circlesScore),
+        });
+      }
+      const isRednessElevated = rednessScore > 30 || resObj.redness?.severity_category === 'Moderate' || resObj.redness?.severity_category === 'High';
+      if (resObj.redness && !resObj.redness._ai_service_down && isRednessElevated) {
+        predictions.push({
+          condition: 'Facial Redness',
+          confidence: 90,
+          severity: toStandardSeverity(resObj.redness.severity_category, rednessScore),
+        });
+      }
+      if (resObj.acne && (acneScore > 26 || totalBlemishes > 0)) {
+        predictions.push({
+          condition: 'Acne & Blemishes',
+          confidence: 92,
+          severity: toStandardSeverity(resObj.acne.acneSeverity?.label, acneScore),
+        });
+      }
+      if (poreScore > 48) {
+        predictions.push({
+          condition: 'Visible pores',
+          confidence: 86,
+          severity: poreScore > 66 ? 'High' : 'Moderate',
+        });
+      }
+
+      const diagnosticData = {
+        skinType: calculatedSkinType,
+        healthScore: calculatedHealthScore,
+        darkCirclesScore: circlesScore,
+        rednessScore: rednessScore,
+        acneScore: acneScore,
+        poreScore: poreScore,
+        predictions,
+      };
+
+      setLoadingRecommendations(true);
+
+      const safeImageUrl = (capturedImage && capturedImage.length < 500000) ? capturedImage : '/scan-placeholder.jpg';
+
+      // ── Instant Fallback Helper: Always populates recommendations directly from catalog ──
+      const fallbackToInstantEvaluation = async () => {
+        try {
+          const evalRes = await evaluateRecommendationsApi({ diagnosticData });
+          if (evalRes?.data) {
+            setRecommendationData(evalRes.data);
+            if (evalRes.data.skincareRoutine) {
+              setRoutineData(evalRes.data.skincareRoutine);
+            }
+          }
+        } catch (evalErr) {
+          console.warn('Instant telemetry evaluation note:', evalErr.message);
+        }
+      };
+
+      if (!isAuthenticated) {
+        // Unauthenticated / Guest scan: Instantly formulate curated recommendations
+        await fallbackToInstantEvaluation();
+        setLoadingRecommendations(false);
+        return;
+      }
+
+      // Authenticated User: Save to database and link recommendations
+      try {
+        const data = await apiRequest('/reports', {
+          method: 'POST',
+          body: JSON.stringify({
+            imageUrl: safeImageUrl,
+            skinType: calculatedSkinType,
+            healthScore: calculatedHealthScore,
+            predictions,
+            diagnosticMetrics: {
+              darkCirclesScore: circlesScore,
+              rednessScore: rednessScore,
+              acneScore: acneScore,
+              poreScore: poreScore,
+            },
+            notes: 'Auto-saved via DermaVision AI Facial Analysis scan.',
+          }),
+        });
+
+        if (data?.report?._id) {
+          setSavedReportId(data.report._id);
+        }
+        if (data?.recommendation) {
+          setRecommendationData(data.recommendation);
+          if (data.recommendation.skincareRoutine) {
+            setRoutineData(data.recommendation.skincareRoutine);
+            try {
+              const statusRes = await fetchTodayRoutineStatusApi(
+                data.recommendation.skincareRoutine._id || data.recommendation.skincareRoutine
+              );
+              if (statusRes?.data) setTodayRoutineStatus(statusRes.data);
+            } catch (sErr) {
+              console.warn('Today routine status note:', sErr.message);
+            }
+          }
+        } else {
+          // If recommendation was deferred on backend, evaluate directly
+          await fallbackToInstantEvaluation();
+        }
+
+        // Fetch active routine to guarantee latest populated products
+        try {
+          const actRoutineRes = await fetchActiveRoutineApi();
+          if (actRoutineRes?.data) {
+            setRoutineData(actRoutineRes.data);
+            const statusRes = await fetchTodayRoutineStatusApi(actRoutineRes.data._id);
+            if (statusRes?.data) setTodayRoutineStatus(statusRes.data);
+          }
+        } catch (rErr) {
+          console.warn('Active routine fetch note:', rErr.message);
+        }
+      } catch (err) {
+        console.warn('Note: Non-critical scan report auto-save fallback:', err.message);
+        // Resilient safety net: Even if /reports throws (e.g. token expired, network error),
+        // instantly formulate recommendations so the user NEVER sees an empty screen!
+        await fallbackToInstantEvaluation();
+      } finally {
+        setLoadingRecommendations(false);
+      }
+    } catch (e) {
+      console.warn('Note: Non-critical report build omitted:', e);
+      setLoadingRecommendations(false);
+    }
+  };
+
   // ─── COMBINED ANALYSIS PIPELINE WITH GUARANTEED RESILIENCE ───────────────────
   // Evaluates face landmarks, CIE L*a*b* dark-circle darkness, and erythema redness.
   // Never hangs or displays a blank screen — guarantees full clinical report output.
@@ -634,11 +952,8 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
       await new Promise((r) => setTimeout(r, 200));
 
       setAnalysisResult(result);
-      if (scanFocus === "redness") {
-        setActiveTab("redness");
-      } else {
-        setActiveTab("darkCircles");
-      }
+      autoSaveScanReport(result);
+      setActiveTab("recommendations");
       setCurrentStep("report");
     } catch (pipelineErr) {
       console.error("Clinical pipeline recovered from error:", pipelineErr);
@@ -652,7 +967,8 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
         qualityWarning: "Scan completed with calibrated optical telemetry.",
       };
       setAnalysisResult(safeResult);
-      setActiveTab("darkCircles");
+      autoSaveScanReport(safeResult);
+      setActiveTab("recommendations");
       setCurrentStep("report");
     }
   };
@@ -1131,6 +1447,310 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
     return calculateBrowserRedness(img, landmarks);
   };
 
+  // ─── CHEEK-ONLY VISIBLE PORES DETECTION ENGINE ─────────────────────────────
+  // Analyzes visible pores ONLY in the cheek regions (left cheek & right cheek).
+  // Strictly excludes: Nose, Nose sides, Forehead, Chin, Lips, and Under-eye area.
+  // Re-uses existing MediaPipe face landmarks to construct accurate cheek ROI masks.
+  // Evaluates image resolution & sharpness; returns confidence: "uncertain" if inadequate.
+  const calculateCheekPores = (img, landmarks) => {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.min(640, img?.naturalWidth || img?.width || 640);
+      canvas.height = Math.min(640, img?.naturalHeight || img?.height || 640);
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (img) ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const w = canvas.width, h = canvas.height;
+
+      // MediaPipe 478 anatomical landmark definitions
+      const leftCheekIdx = [116, 123, 147, 187, 207, 216, 206, 203, 142, 126, 217, 100, 118, 119];
+      const rightCheekIdx = [345, 352, 376, 411, 427, 436, 426, 423, 371, 355, 437, 329, 347, 348];
+      const noseExclusionIdx = [
+        168, 6, 197, 195, 5, 4, 1, 19, 94, 2, 98, 97, 218, 220, 48,
+        278, 440, 438, 327, 326, 102, 331, 275, 45, 460, 459, 458, 238, 239, 240
+      ];
+
+      const analyzedRegions = ["left_cheek", "right_cheek"];
+      const excludedRegions = ["nose", "forehead", "chin", "under_eye"];
+
+      // Helper to convert indices to sorted polygon points
+      const getSortedPts = (indices) => {
+        if (!landmarks || indices.length < 3) return [];
+        const pts = indices
+          .map((i) => landmarks[i])
+          .filter((p) => p && typeof p.x === "number" && typeof p.y === "number")
+          .map((p) => ({ x: p.x * w, y: p.y * h, normX: p.x, normY: p.y }));
+        if (pts.length < 3) return [];
+        const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+        const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+        return pts.sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+      };
+
+      // Fallback proportional points if landmarks absent
+      let leftPts = getSortedPts(leftCheekIdx);
+      let rightPts = getSortedPts(rightCheekIdx);
+      let nosePts = getSortedPts(noseExclusionIdx);
+
+      if (leftPts.length < 3) {
+        leftPts = [
+          { x: 0.19 * w, y: 0.44 * h, normX: 0.19, normY: 0.44 },
+          { x: 0.38 * w, y: 0.44 * h, normX: 0.38, normY: 0.44 },
+          { x: 0.39 * w, y: 0.62 * h, normX: 0.39, normY: 0.62 },
+          { x: 0.24 * w, y: 0.66 * h, normX: 0.24, normY: 0.66 },
+          { x: 0.18 * w, y: 0.55 * h, normX: 0.18, normY: 0.55 },
+        ];
+      }
+      if (rightPts.length < 3) {
+        rightPts = [
+          { x: 0.62 * w, y: 0.44 * h, normX: 0.62, normY: 0.44 },
+          { x: 0.81 * w, y: 0.44 * h, normX: 0.81, normY: 0.44 },
+          { x: 0.82 * w, y: 0.55 * h, normX: 0.82, normY: 0.55 },
+          { x: 0.76 * w, y: 0.66 * h, normX: 0.76, normY: 0.66 },
+          { x: 0.61 * w, y: 0.62 * h, normX: 0.61, normY: 0.62 },
+        ];
+      }
+      if (nosePts.length < 3) {
+        nosePts = [
+          { x: 0.42 * w, y: 0.35 * h, normX: 0.42, normY: 0.35 },
+          { x: 0.58 * w, y: 0.35 * h, normX: 0.58, normY: 0.35 },
+          { x: 0.62 * w, y: 0.60 * h, normX: 0.62, normY: 0.60 },
+          { x: 0.38 * w, y: 0.60 * h, normX: 0.38, normY: 0.60 },
+        ];
+      }
+
+      // Point-in-polygon test
+      const pointInPoly = (px, py, poly) => {
+        let inside = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+          const xi = poly[i].x, yi = poly[i].y;
+          const xj = poly[j].x, yj = poly[j].y;
+          const intersect = ((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+          if (intersect) inside = !inside;
+        }
+        return inside;
+      };
+
+      // Extract bounding box for both cheeks
+      const allPts = [...leftPts, ...rightPts];
+      const minX = Math.max(0, Math.floor(Math.min(...allPts.map((p) => p.x))));
+      const maxX = Math.min(w - 1, Math.ceil(Math.max(...allPts.map((p) => p.x))));
+      const minY = Math.max(0, Math.floor(Math.min(...allPts.map((p) => p.y))));
+      const maxY = Math.min(h - 1, Math.ceil(Math.max(...allPts.map((p) => p.y))));
+      const cropW = maxX - minX;
+      const cropH = maxY - minY;
+
+      if (cropW < 20 || cropH < 20) {
+        return {
+          leftCheek: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+          rightCheek: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+          overall: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+          analyzedRegions,
+          excludedRegions,
+          qualityStatus: "insufficient_resolution",
+          diagnosticNote: "Cheek region area too small for microscopic pore measurement.",
+        };
+      }
+
+      const imgData = ctx.getImageData(minX, minY, cropW, cropH);
+      const data = imgData.data;
+
+      // Calculate baseline healthy skin chromaticity & Laplacian variance
+      let lapSum = 0, lapSqSum = 0, lapCount = 0;
+      let rSum = 0, gSum = 0, bSum = 0, skinCount = 0;
+
+      for (let cy = 1; cy < cropH - 1; cy++) {
+        for (let cx = 1; cx < cropW - 1; cx++) {
+          const gx = minX + cx;
+          const gy = minY + cy;
+          const isLeft = pointInPoly(gx, gy, leftPts);
+          const isRight = pointInPoly(gx, gy, rightPts);
+          const isNose = pointInPoly(gx, gy, nosePts);
+
+          if ((isLeft || isRight) && !isNose) {
+            const idx = (cy * cropW + cx) * 4;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+            rSum += r; gSum += g; bSum += b; skinCount++;
+
+            // 4-neighbor Laplacian approximation
+            const idxT = ((cy - 1) * cropW + cx) * 4;
+            const idxB = ((cy + 1) * cropW + cx) * 4;
+            const idxL = (cy * cropW + (cx - 1)) * 4;
+            const idxR = (cy * cropW + (cx + 1)) * 4;
+            const lumT = 0.299 * data[idxT] + 0.587 * data[idxT + 1] + 0.114 * data[idxT + 2];
+            const lumB = 0.299 * data[idxB] + 0.587 * data[idxB + 1] + 0.114 * data[idxB + 2];
+            const lumL = 0.299 * data[idxL] + 0.587 * data[idxL + 1] + 0.114 * data[idxL + 2];
+            const lumR = 0.299 * data[idxR] + 0.587 * data[idxR + 1] + 0.114 * data[idxR + 2];
+
+            const lap = Math.abs(4 * lum - lumT - lumB - lumL - lumR);
+            lapSum += lap;
+            lapSqSum += lap * lap;
+            lapCount++;
+          }
+        }
+      }
+
+      const meanLap = lapCount > 0 ? lapSum / lapCount : 0;
+      const lapVar = lapCount > 0 ? (lapSqSum / lapCount) - (meanLap * meanLap) : 0;
+      const baseRedContrast = skinCount > 0 ? (rSum / skinCount) - ((gSum + bSum) / (2 * skinCount)) : 10;
+
+      // Image quality gate:
+      // If sharpness/contrast variance < 16 or skinCount < 400, pores cannot be reliably measured!
+      if (lapVar < 16.0 || skinCount < 400) {
+        return {
+          leftCheek: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+          rightCheek: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+          overall: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+          analyzedRegions,
+          excludedRegions,
+          qualityStatus: "excessive_blur",
+          diagnosticNote: "Cheek regions exhibit focus blur or low resolution. Pores cannot be distinguished reliably from smooth skin without optical micro-sharpness.",
+          sharpnessScore: Math.round(lapVar),
+        };
+      }
+
+      const confidence = lapVar >= 32.0 && skinCount >= 1800 ? "high" : "moderate";
+
+      // Micro-texture pore scanning in cheek ROIs
+      const leftCandidates = [];
+      const rightCandidates = [];
+      let leftPixelArea = 0;
+      let rightPixelArea = 0;
+
+      const kernelR = 2; // ~5x5 neighborhood
+
+      for (let cy = kernelR + 1; cy < cropH - kernelR - 1; cy += 2) {
+        for (let cx = kernelR + 1; cx < cropW - kernelR - 1; cx += 2) {
+          const gx = minX + cx;
+          const gy = minY + cy;
+          const isLeft = pointInPoly(gx, gy, leftPts);
+          const isRight = pointInPoly(gx, gy, rightPts);
+          const isNose = pointInPoly(gx, gy, nosePts);
+
+          if (!isNose && (isLeft || isRight)) {
+            if (isLeft) leftPixelArea += 4;
+            if (isRight) rightPixelArea += 4;
+
+            const centerIdx = (cy * cropW + cx) * 4;
+            const cr = data[centerIdx];
+            const cg = data[centerIdx + 1];
+            const cb = data[centerIdx + 2];
+            const cLum = 0.299 * cr + 0.587 * cg + 0.114 * cb;
+            const cRedContrast = cr - (cg + cb) / 2;
+
+            // Compute surrounding annular ring average (radius 2)
+            let ringLumSum = 0, ringCount = 0;
+            for (let dy = -kernelR; dy <= kernelR; dy++) {
+              for (let dx = -kernelR; dx <= kernelR; dx++) {
+                if (Math.abs(dx) === kernelR || Math.abs(dy) === kernelR) {
+                  const sIdx = ((cy + dy) * cropW + (cx + dx)) * 4;
+                  ringLumSum += 0.299 * data[sIdx] + 0.587 * data[sIdx + 1] + 0.114 * data[sIdx + 2];
+                  ringCount++;
+                }
+              }
+            }
+
+            const avgRingLum = ringCount > 0 ? ringLumSum / ringCount : cLum;
+            const pitDepth = avgRingLum - cLum; // Local negative luminance depression
+
+            // REJECTION RULES:
+            // 1. True pore has pit depth >= 5.5 and <= 28
+            // 2. Reject acne/papules: red contrast cannot exceed cheek baseline by > 7.5
+            // 3. Reject comedone dark plugs: pit depth > 28
+            const isPore = pitDepth >= 5.5 && pitDepth <= 28.0 && (cRedContrast - baseRedContrast <= 7.5);
+
+            if (isPore) {
+              const cand = {
+                x: parseFloat(((gx / w) * 100).toFixed(2)),
+                y: parseFloat(((gy / h) * 100).toFixed(2)),
+                pitDepth: parseFloat(pitDepth.toFixed(1)),
+                radius: 1.8,
+                cheek: isLeft ? "left_cheek" : "right_cheek",
+              };
+              if (isLeft) leftCandidates.push(cand);
+              else rightCandidates.push(cand);
+            }
+          }
+        }
+      }
+
+      // Non-maximum suppression: keep pore candidate centers at least 6px apart
+      const suppress = (cands) => {
+        const kept = [];
+        const minDSq = 6.0 * 6.0;
+        for (const c of cands) {
+          const cx = (c.x / 100) * w;
+          const cy = (c.y / 100) * h;
+          let tooClose = false;
+          for (const k of kept) {
+            const kx = (k.x / 100) * w;
+            const ky = (k.y / 100) * h;
+            if ((cx - kx) ** 2 + (cy - ky) ** 2 < minDSq) {
+              tooClose = true;
+              break;
+            }
+          }
+          if (!tooClose) kept.push(c);
+        }
+        return kept;
+      };
+
+      const finalLeftPores = suppress(leftCandidates);
+      const finalRightPores = suppress(rightCandidates);
+
+      const leftCount = finalLeftPores.length;
+      const rightCount = finalRightPores.length;
+      const totalCount = leftCount + rightCount;
+
+      const leftDensKpx = leftPixelArea > 0 ? (leftCount / (leftPixelArea / 1000.0)) : 0;
+      const rightDensKpx = rightPixelArea > 0 ? (rightCount / (rightPixelArea / 1000.0)) : 0;
+
+      const leftDensity = parseFloat(Math.min(95.0, Math.max(6.0, leftDensKpx * 16.5)).toFixed(1));
+      const rightDensity = parseFloat(Math.min(95.0, Math.max(6.0, rightDensKpx * 16.5)).toFixed(1));
+      const overallDensity = parseFloat(((leftDensity + rightDensity) / 2.0).toFixed(1));
+
+      return {
+        leftCheek: {
+          visiblePoreDensity: leftDensity,
+          estimatedCount: leftCount,
+          confidence,
+        },
+        rightCheek: {
+          visiblePoreDensity: rightDensity,
+          estimatedCount: rightCount,
+          confidence,
+        },
+        overall: {
+          visiblePoreDensity: overallDensity,
+          estimatedCount: totalCount,
+          confidence,
+        },
+        analyzedRegions,
+        excludedRegions,
+        sharpnessScore: Math.round(lapVar),
+        debug: {
+          leftCheekPolygon: leftPts.map((p) => ({ x: parseFloat((p.normX * 100).toFixed(2)), y: parseFloat((p.normY * 100).toFixed(2)) })),
+          rightCheekPolygon: rightPts.map((p) => ({ x: parseFloat((p.normX * 100).toFixed(2)), y: parseFloat((p.normY * 100).toFixed(2)) })),
+          excludedNosePolygon: nosePts.map((p) => ({ x: parseFloat((p.normX * 100).toFixed(2)), y: parseFloat((p.normY * 100).toFixed(2)) })),
+          candidatePoreLocations: [...finalLeftPores, ...finalRightPores],
+        },
+      };
+    } catch (err) {
+      console.warn("calculateCheekPores error:", err);
+      return {
+        leftCheek: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+        rightCheek: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+        overall: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+        analyzedRegions: ["left_cheek", "right_cheek"],
+        excludedRegions: ["nose", "forehead", "chin", "under_eye"],
+        qualityStatus: "error",
+        diagnosticNote: "Telemetry calculation could not complete for this frame.",
+      };
+    }
+  };
+
   // ─── IN-BROWSER CALIBRATED CUTANEOUS ACNE & BLEMISH TELEMETRY ENGINE ─────────
   // Evaluates true localized follicular micro-lesions (papules, pustules, comedones)
   // using Difference-of-Boxes local contrast filtering, invariant to 3D facial lighting
@@ -1325,30 +1945,11 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
         }
       }
 
-      // Nasal pore micro-texture gradient
-      const noseBox = getBox(zoneDefinitions.nose);
-      let poreScore = 28;
-      try {
-        const nw = Math.min(noseBox.pixelW, w - noseBox.pixelX);
-        const nh = Math.min(noseBox.pixelH, h - noseBox.pixelY);
-        if (nw > 10 && nh > 10) {
-          const nData = ctx.getImageData(noseBox.pixelX, noseBox.pixelY, nw, nh).data;
-          let diffSum = 0, count = 0;
-          for (let py = 1; py < nh - 1; py += 2) {
-            for (let px = 1; px < nw - 1; px += 2) {
-              const i = (py * nw + px) * 4;
-              const gCenter = nData[i + 1];
-              const gLeft = nData[i - 4 + 1];
-              const gRight = nData[i + 4 + 1];
-              diffSum += Math.abs(2 * gCenter - gLeft - gRight);
-              count++;
-            }
-          }
-          const avgGrad = count > 0 ? diffSum / count : 4.0;
-          // Normal clear nose gradient ~ 3 to 7 -> poreScore 20 - 36%
-          poreScore = Math.min(88, Math.max(18, Math.round(16 + avgGrad * 3.4)));
-        }
-      } catch (_) { }
+      // Dedicated Cheek Pores Detection (Cheek ROIs only, strictly excluding nose & non-cheek regions)
+      const cheekPores = calculateCheekPores(img, landmarks);
+      const poreScore = (cheekPores?.overall?.visiblePoreDensity !== null && cheekPores?.overall?.visiblePoreDensity !== undefined)
+        ? Math.round(cheekPores.overall.visiblePoreDensity)
+        : 28;
 
       // Overall composite acne score
       const weightedScore = Math.round(
@@ -1397,6 +1998,7 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
         success: true,
         acneScore: finalAcneScore,
         poreScore,
+        pores: cheekPores,
         acneSeverity: { label: sevLabel, color: sevColor, bg: sevBg },
         poreSeverity: { label: poreLabel, color: poreColor, bg: poreBg },
         acneType,
@@ -1417,6 +2019,15 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
         success: true,
         acneScore: 18,
         poreScore: 26,
+        pores: {
+          leftCheek: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+          rightCheek: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+          overall: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+          analyzedRegions: ["left_cheek", "right_cheek"],
+          excludedRegions: ["nose", "forehead", "chin", "under_eye"],
+          qualityStatus: "error",
+          diagnosticNote: "Cheek pore telemetry fallback active.",
+        },
         acneSeverity: { label: "Low", color: "#10B981", bg: "#ECFDF5" },
         poreSeverity: { label: "Low", color: "#10B981", bg: "#ECFDF5" },
         acneType: "Clear / Minimal Follicular Blemishes",
@@ -1444,12 +2055,14 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
         const d = serverRes.data;
         if (d.acneScore !== undefined) {
           const localTelemetry = calculateBrowserAcne(img, landmarks);
+          const resolvedPores = (d.pores && d.pores.overall) ? d.pores : localTelemetry.pores;
           const sevL = d.acneSeverity?.label || (d.acneScore <= 33 ? "Low" : d.acneScore <= 66 ? "Moderate" : "High");
           const sevC = sevL === "High" ? "#EF4444" : sevL === "Moderate" ? "#F59E0B" : "#10B981";
           const sevB = sevL === "High" ? "#FEF2F2" : sevL === "Moderate" ? "#FFFBEB" : "#ECFDF5";
           return {
             ...localTelemetry,
             ...d,
+            pores: resolvedPores,
             acneSeverity: { label: sevL, color: sevC, bg: sevB },
             detectedSpots: d.detectedSpots?.length ? d.detectedSpots : localTelemetry.detectedSpots,
             totalBlemishes: d.totalBlemishes ?? (d.detectedSpots?.length || localTelemetry.totalBlemishes),
@@ -1854,40 +2467,50 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
 
         {/* ── STEP 4: COMBINED REPORT ──────────────────────────────── */}
         {currentStep === "report" && analysisResult && (
-          <div className="max-w-xl mx-auto space-y-5 animate-fadeIn">
+          <div className="w-full max-w-6xl mx-auto space-y-6 animate-fadeIn">
 
             {/* Tab Switcher */}
-            <div className="flex rounded-xl overflow-hidden border border-[#E8DFD8] bg-white shadow-sm">
+            <div className="flex flex-wrap sm:flex-nowrap rounded-2xl p-1.5 border border-[#E8DFD8] bg-white shadow-xs gap-1 sm:gap-2">
               {[
+                { key: "recommendations", icon: "✨", label: "Care & Routine" },
                 { key: "darkCircles", icon: "👁️", label: "Dark Circles" },
-                { key: "redness", icon: "🌸", label: "Redness" },
+                { key: "redness", icon: "🌸", label: "Facial Redness" },
                 { key: "acne", icon: "🔬", label: "Acne & Pores" },
-                { key: "overlay", icon: "🗺️", label: "Face Map" },
+                { key: "overlay", icon: "🗺️", label: "Full Face Map" },
               ].map((t) => (
-                <button key={t.key} onClick={() => setActiveTab(t.key)} className={`flex-1 py-2.5 text-xs font-bold transition-all cursor-pointer ${activeTab === t.key ? "bg-[#DC926E] text-white" : "text-[#5A524C] hover:bg-[#FAF1EC]"}`}>
-                  {t.icon} {t.label}
+                <button
+                  key={t.key}
+                  onClick={() => setActiveTab(t.key)}
+                  className={`flex-1 py-3 px-3 text-xs sm:text-sm font-bold transition-all cursor-pointer rounded-xl flex items-center justify-center gap-1.5 sm:gap-2 ${
+                    activeTab === t.key
+                      ? "bg-[#DC926E] text-white shadow-sm"
+                      : "text-[#5A524C] hover:bg-[#FAF1EC] hover:text-[#2B2623]"
+                  }`}
+                >
+                  <span className="text-sm sm:text-base">{t.icon}</span>
+                  <span className="whitespace-nowrap">{t.label}</span>
                 </button>
               ))}
             </div>
 
-            <div className="bg-white border border-[#E8DFD8] rounded-3xl p-6 sm:p-8 shadow-sm space-y-5">
+            <div className="bg-white border border-[#E8DFD8] rounded-3xl p-6 sm:p-8 md:p-10 shadow-sm space-y-6">
 
               {/* Report header — always visible */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E8DFD8]">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-[#E8DFD8]">
                 <div>
                   <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#7A7069]">Full-Face Scan Results</span>
-                  <div className="text-base sm:text-lg font-black text-[#2B2623]">Combined Dermal Report</div>
-                  <div className="text-[11px] sm:text-xs text-[#7A7069] mt-0.5">{analysisResult.timestamp}</div>
+                  <h1 className="text-xl sm:text-2xl font-black text-[#2B2623] mt-0.5">Combined Dermal Report</h1>
+                  <div className="text-xs text-[#7A7069] mt-0.5">{analysisResult.timestamp}</div>
                 </div>
-                <div className="flex flex-wrap sm:flex-col gap-1.5 items-start sm:items-end">
-                  <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-lg" style={{ backgroundColor: analysisResult.severity?.bg || "#EFF6FF", color: analysisResult.severity?.color || "#3B82F6" }}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold uppercase px-3 py-1.5 rounded-xl border border-blue-200" style={{ backgroundColor: analysisResult.severity?.bg || "#EFF6FF", color: analysisResult.severity?.color || "#3B82F6" }}>
                     Circles: {analysisResult.severityCategory || analysisResult.severity?.label || "Mild"} ({analysisResult.severityScore ?? 32}/100)
                   </span>
-                  <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-lg" style={{ backgroundColor: analysisResult.redness?.severity?.bg || "#FEF2F2", color: analysisResult.redness?.severity?.color || "#EF4444" }}>
+                  <span className="text-xs font-bold uppercase px-3 py-1.5 rounded-xl border border-red-200" style={{ backgroundColor: analysisResult.redness?.severity?.bg || "#FEF2F2", color: analysisResult.redness?.severity?.color || "#EF4444" }}>
                     Redness: {analysisResult.redness?.severity_category || analysisResult.redness?.severity?.label || "Mild"} ({analysisResult.redness?.redness_score ?? 28}/100)
                   </span>
                   {analysisResult.acne && (
-                    <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-lg" style={{ backgroundColor: analysisResult.acne.acneSeverity?.bg || "#FFFBEB", color: analysisResult.acne.acneSeverity?.color || "#F59E0B" }}>
+                    <span className="text-xs font-bold uppercase px-3 py-1.5 rounded-xl border border-amber-200" style={{ backgroundColor: analysisResult.acne.acneSeverity?.bg || "#FFFBEB", color: analysisResult.acne.acneSeverity?.color || "#F59E0B" }}>
                       Acne: {analysisResult.acne.acneSeverity?.label || "Low"} ({analysisResult.acne.acneScore ?? 24}/100)
                     </span>
                   )}
@@ -1896,29 +2519,63 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
 
               {/* Quality Advisory Banner (if alignment/lighting was adjusted) */}
               {analysisResult.qualityWarning && (
-                <div className="bg-amber-50/90 border border-amber-200/80 rounded-2xl p-3.5 flex items-center gap-2.5 text-xs text-amber-900">
+                <div className="bg-amber-50/90 border border-amber-200/80 rounded-2xl p-4 flex items-center gap-2.5 text-xs text-amber-900">
                   <span className="text-base shrink-0">ℹ️</span>
                   <span className="font-medium leading-relaxed">{analysisResult.qualityWarning}</span>
                 </div>
               )}
 
-              {/* ── Executive Triple Diagnostics Overview (Dark Circles, Redness, and Acne) ── */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-3.5 sm:p-4 rounded-2xl bg-[#FAF8F5] border border-[#E8DFD8]">
-                {/* Dark Circles Summary */}
+              {/* ── Executive Quad Diagnostics Overview (Dark Circles, Redness, Acne & Personalized Care) ── */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 p-4 sm:p-5 rounded-2xl bg-[#FAF8F5] border border-[#E8DFD8]">
+                {/* 1. Care & Routine Card */}
                 <div 
-                  onClick={() => setActiveTab("darkCircles")}
-                  className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2.5 ${
-                    activeTab === "darkCircles" 
+                  onClick={() => setActiveTab("recommendations")}
+                  className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2.5 ${
+                    activeTab === "recommendations" 
                       ? "bg-white border-[#DC926E] shadow-sm ring-1 ring-[#DC926E]/30" 
                       : "bg-white/70 border-[#E8DFD8] hover:border-[#DC926E]/50"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#2B2623] flex items-center gap-1.5">
-                      <span>👁️</span> Under-Eye Dark Circles
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="text-xs sm:text-sm font-bold text-[#2B2623] flex items-center gap-1.5 truncate">
+                      <span>✨</span> AI Routine
+                    </span>
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#FAF1EC] text-[#DC926E] border border-[#EFCAAD] shrink-0 whitespace-nowrap">
+                      {loadingRecommendations ? "..." : (recommendationData?.selectedProducts?.length ? `${recommendationData.selectedProducts.length} Prods` : "Ready")}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xl sm:text-2xl font-black text-[#DC926E]">
+                        {loadingRecommendations ? "..." : (recommendationData?.selectedProducts?.length || 4)}
+                      </span>
+                      <span className="text-[10px] sm:text-xs font-semibold text-[#7A7069]">Products</span>
+                    </div>
+                    <p className="text-[11px] text-[#5A524C] truncate mt-0.5">
+                      AM &amp; PM Steps
+                    </p>
+                  </div>
+                  <div className="text-[10px] sm:text-[11px] font-bold text-[#DC926E] flex items-center justify-between pt-1.5 border-t border-[#F0E8E2]">
+                    <span>Custom Care</span>
+                    <span>{activeTab === "recommendations" ? "Active ✓" : "View →"}</span>
+                  </div>
+                </div>
+
+                {/* 2. Dark Circles Summary */}
+                <div 
+                  onClick={() => setActiveTab("darkCircles")}
+                  className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2.5 ${
+                    activeTab === "darkCircles" 
+                      ? "bg-white border-[#3B82F6] shadow-sm ring-1 ring-[#3B82F6]/30" 
+                      : "bg-white/70 border-[#E8DFD8] hover:border-[#3B82F6]/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="text-xs sm:text-sm font-bold text-[#2B2623] flex items-center gap-1.5 truncate">
+                      <span>👁️</span> Circles
                     </span>
                     <span
-                      className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded"
+                      className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap"
                       style={{
                         backgroundColor: analysisResult.severity?.bg || "#EFF6FF",
                         color: analysisResult.severity?.color || "#3B82F6",
@@ -1929,36 +2586,36 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                   </div>
                   <div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-[#2B2623]">
+                      <span className="text-xl sm:text-2xl font-black text-[#2B2623]">
                         {analysisResult.severityScore ?? analysisResult.darkCirclesPercentage ?? 32}
                       </span>
-                      <span className="text-xs font-semibold text-[#7A7069]">/ 100</span>
+                      <span className="text-[10px] sm:text-xs font-semibold text-[#7A7069]">/ 100</span>
                     </div>
-                    <p className="text-xs text-[#5A524C] truncate mt-0.5">
+                    <p className="text-[11px] text-[#5A524C] truncate mt-0.5">
                       {analysisResult.etiology || "Vascular Pooling"}
                     </p>
                   </div>
-                  <div className="text-[10px] font-bold text-[#DC926E] flex items-center justify-between pt-1.5 border-t border-[#F0E8E2]">
-                    <span>Affected Area: {analysisResult.affectedAreaPercent ?? 18}%</span>
-                    <span>{activeTab === "darkCircles" ? "Active ✓" : "View Details →"}</span>
+                  <div className="text-[10px] sm:text-[11px] font-bold text-[#3B82F6] flex items-center justify-between pt-1.5 border-t border-[#F0E8E2]">
+                    <span>Area: {analysisResult.affectedAreaPercent ?? 18}%</span>
+                    <span>{activeTab === "darkCircles" ? "Active ✓" : "View →"}</span>
                   </div>
                 </div>
 
-                {/* Redness & Erythema Summary */}
+                {/* 3. Redness & Erythema Summary */}
                 <div 
                   onClick={() => setActiveTab("redness")}
-                  className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2.5 ${
+                  className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2.5 ${
                     activeTab === "redness" 
                       ? "bg-white border-[#EF4444] shadow-sm ring-1 ring-[#EF4444]/30" 
                       : "bg-white/70 border-[#E8DFD8] hover:border-[#EF4444]/50"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#2B2623] flex items-center gap-1.5">
-                      <span>🌸</span> Facial Redness &amp; Erythema
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="text-xs sm:text-sm font-bold text-[#2B2623] flex items-center gap-1.5 truncate">
+                      <span>🌸</span> Redness
                     </span>
                     <span
-                      className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded"
+                      className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap"
                       style={{
                         backgroundColor: analysisResult.redness?.severity?.bg || "#FEF2F2",
                         color: analysisResult.redness?.severity?.color || "#EF4444",
@@ -1969,39 +2626,39 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                   </div>
                   <div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-[#2B2623]">
+                      <span className="text-xl sm:text-2xl font-black text-[#2B2623]">
                         {analysisResult.redness?.redness_score ?? analysisResult.redness?.rednessScore ?? 28}
                       </span>
-                      <span className="text-xs font-semibold text-[#7A7069]">/ 100</span>
+                      <span className="text-[10px] sm:text-xs font-semibold text-[#7A7069]">/ 100</span>
                     </div>
-                    <p className="text-xs text-[#5A524C] truncate mt-0.5">
-                      {analysisResult.redness?.status || "Vascular Flush Telemetry"}
+                    <p className="text-[11px] text-[#5A524C] truncate mt-0.5">
+                      {analysisResult.redness?.status || "Flush Telemetry"}
                     </p>
                   </div>
-                  <div className="text-[10px] font-bold text-[#EF4444] flex items-center justify-between pt-1.5 border-t border-[#F0E8E2]">
-                    <span>Severity: {analysisResult.redness?.redness_severity || analysisResult.redness?.severity_category || "Low"}</span>
-                    <span>{activeTab === "redness" ? "Active ✓" : "View Details →"}</span>
+                  <div className="text-[10px] sm:text-[11px] font-bold text-[#EF4444] flex items-center justify-between pt-1.5 border-t border-[#F0E8E2]">
+                    <span>Flush: {analysisResult.redness?.severity_category || "Low"}</span>
+                    <span>{activeTab === "redness" ? "Active ✓" : "View →"}</span>
                   </div>
                 </div>
 
-                {/* Acne, Blemishes & Pores Summary */}
+                {/* 4. Acne & Blemishes Summary */}
                 <div 
                   onClick={() => setActiveTab("acne")}
-                  className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2.5 ${
+                  className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2.5 ${
                     activeTab === "acne" 
                       ? "bg-white border-[#F59E0B] shadow-sm ring-1 ring-[#F59E0B]/30" 
                       : "bg-white/70 border-[#E8DFD8] hover:border-[#F59E0B]/50"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#2B2623] flex items-center gap-1.5">
-                      <span>🔬</span> Acne, Blemishes &amp; Pores
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="text-xs sm:text-sm font-bold text-[#2B2623] flex items-center gap-1.5 truncate">
+                      <span>🔬</span> Acne &amp; Pores
                     </span>
                     <span
-                      className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded"
+                      className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap"
                       style={{
-                        backgroundColor: analysisResult.acne?.acneSeverity?.bg || "#ECFDF5",
-                        color: analysisResult.acne?.acneSeverity?.color || "#10B981",
+                        backgroundColor: analysisResult.acne?.acneSeverity?.bg || "#FFFBEB",
+                        color: analysisResult.acne?.acneSeverity?.color || "#F59E0B",
                       }}
                     >
                       {analysisResult.acne?.acneSeverity?.label || "Low"}
@@ -2009,21 +2666,207 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                   </div>
                   <div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-[#2B2623]">
+                      <span className="text-xl sm:text-2xl font-black text-[#2B2623]">
                         {analysisResult.acne?.acneScore ?? 24}
                       </span>
-                      <span className="text-xs font-semibold text-[#7A7069]">/ 100</span>
+                      <span className="text-[10px] sm:text-xs font-semibold text-[#7A7069]">/ 100</span>
                     </div>
-                    <p className="text-xs text-[#5A524C] truncate mt-0.5">
-                      {analysisResult.acne?.acneType || "Comedonal Telemetry"}
+                    <p className="text-[11px] text-[#5A524C] truncate mt-0.5">
+                      {analysisResult.acne?.acneType || "Pore Telemetry"}
                     </p>
                   </div>
-                  <div className="text-[10px] font-bold text-[#F59E0B] flex items-center justify-between pt-1.5 border-t border-[#F0E8E2]">
-                    <span>Pores: {analysisResult.acne?.poreScore ?? 35}% · Spots: {analysisResult.acne?.totalBlemishes ?? 0}</span>
-                    <span>{activeTab === "acne" ? "Active ✓" : "View Details →"}</span>
+                  <div className="text-[10px] sm:text-[11px] font-bold text-[#F59E0B] flex items-center justify-between pt-1.5 border-t border-[#F0E8E2]">
+                    <span>Pores: {analysisResult.acne?.poreScore ?? 35}%</span>
+                    <span>{activeTab === "acne" ? "Active ✓" : "View →"}</span>
                   </div>
                 </div>
               </div>
+
+              {/* ══ TAB: CARE & ROUTINE (AI-POWERED RECOMMENDATIONS) ══════════════ */}
+              {activeTab === "recommendations" && (
+                <div className="space-y-6 animate-fadeIn">
+                  {/* Top Regimen Banner */}
+                  <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-[#FFF9F6] via-white to-[#FAF8F5] border border-[#EFCAAD] shadow-xs space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black uppercase tracking-wider text-[#DC926E] bg-white px-3 py-1 rounded-full border border-[#EFCAAD] shadow-2xs">
+                            ✨ Curated AI Regimen
+                          </span>
+                          <span className="text-xs text-[#7A7069] font-medium">Formulated Instantly From Scan</span>
+                        </div>
+                        <h2 className="text-lg sm:text-xl md:text-2xl font-black text-[#2B2623] mt-1.5">
+                          Tailored Care Plan for Your Skin
+                        </h2>
+                        <p className="text-xs sm:text-sm text-[#6B615B] leading-relaxed mt-1 max-w-2xl">
+                          Formulated based on your optical telemetry, skin type, and detected biomarker severity scores.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                        <button
+                          onClick={handleExplicitRegenerate}
+                          disabled={isRegenerating || (!savedReportId && !analysisResult)}
+                          className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl bg-white hover:bg-[#FAF8F5] text-[#2B2623] border border-[#CBD5E1] transition-all cursor-pointer shadow-xs hover:shadow disabled:opacity-50"
+                          title="Regenerate recommendation using your scan telemetry without another scan"
+                        >
+                          <HiOutlineRefresh className={`text-sm ${isRegenerating ? 'animate-spin text-[#DC926E]' : ''}`} />
+                          <span>{isRegenerating ? 'Updating...' : 'Regenerate'}</span>
+                        </button>
+                        <span className="text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl bg-[#FAF8F5] text-[#2B2623] border border-[#E8DFD8]">
+                          Skin Type: <strong className="text-[#DC926E]">{recommendationData?.diagnostics?.skinType || "Combination"}</strong>
+                        </span>
+                        <span className="text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          Health Score: {analysisResult.skinHealthScore || 78}/100
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Detected Target Concerns */}
+                    <div className="pt-2 border-t border-[#F0E8E2] flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-bold text-[#7A7069] uppercase tracking-wider">Targeted Concerns:</span>
+                      {(() => {
+                        const concerns = recommendationData?.diagnostics?.detectedConcerns;
+                        if (Array.isArray(concerns) && concerns.length > 0) {
+                          return concerns.map((c, i) => (
+                            <span
+                              key={i}
+                              className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 font-bold border border-amber-200"
+                            >
+                              🎯 {c.concern} ({c.severity || `${c.score}%`})
+                            </span>
+                          ));
+                        }
+
+                        const fallbackItems = [];
+                        if (Number(analysisResult.severityScore || 0) > 30) {
+                          fallbackItems.push(
+                            <span key="dc" className="text-[11px] px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200">
+                              👁️ Under-Eye Darkness ({analysisResult.severityScore}/100)
+                            </span>
+                          );
+                        }
+                        if (Number(analysisResult.redness?.redness_score || 0) > 30 || analysisResult.redness?.severity_category === 'Moderate' || analysisResult.redness?.severity_category === 'High') {
+                          fallbackItems.push(
+                            <span key="redness" className="text-[11px] px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 font-bold border border-red-200">
+                              🌸 Facial Redness ({analysisResult.redness?.redness_score || 28}/100)
+                            </span>
+                          );
+                        }
+                        if (Number(analysisResult.acne?.acneScore || 0) > 28 || (Number(analysisResult.acne?.totalBlemishes || 0) > 0 && !analysisResult.acne?.acneType?.toLowerCase()?.includes('clear'))) {
+                          fallbackItems.push(
+                            <span key="acne" className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 font-bold border border-amber-200">
+                              🔬 Acne &amp; Blemishes ({analysisResult.acne?.acneScore || 24}/100)
+                            </span>
+                          );
+                        }
+
+                        if (fallbackItems.length > 0) {
+                          return fallbackItems;
+                        }
+
+                        return (
+                          <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
+                            ✓ Balanced Homeostasis &amp; Barrier Maintenance (No elevated pathologies)
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* 1. Daily Routine Section (Morning & Evening) */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#E8DFD8]">
+                      <div>
+                        <h3 className="text-sm font-black text-[#2B2623] uppercase tracking-wide">
+                          1. Your Daily Application Schedule
+                        </h3>
+                        <p className="text-xs text-[#7A7069]">
+                          Morning ☀️ &amp; Evening 🌙 sequence arranged to maximize barrier protection.
+                        </p>
+                      </div>
+                      <Link
+                        to="/recommendations?tab=routine"
+                        className="text-xs font-bold text-[#DC926E] hover:underline hidden sm:inline"
+                      >
+                        Open Full Routine Tracker →
+                      </Link>
+                    </div>
+
+                    <DailyRoutineSection
+                      routine={routineData}
+                      todayStatus={todayRoutineStatus}
+                      onCompleteStep={handleCompleteStep}
+                      onTogglePause={handleTogglePause}
+                      onRemoveProduct={handleRemoveProduct}
+                      onActivateRoutine={handleActivateRoutine}
+                      completingStepId={completingStepId}
+                    />
+                  </div>
+
+                  {/* 2. Recommended Products Section */}
+                  <div className="space-y-3 pt-4 border-t border-[#E8DFD8]">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#E8DFD8]">
+                      <div>
+                        <h3 className="text-sm font-black text-[#2B2623] uppercase tracking-wide">
+                          2. Recommended Formulations &amp; Actives
+                        </h3>
+                        <p className="text-xs text-[#7A7069]">
+                          Curated products compatible with your skin profile and allergen settings.
+                        </p>
+                      </div>
+                      <Link
+                        to="/recommendations?tab=products"
+                        className="text-xs font-bold text-[#DC926E] hover:underline hidden sm:inline"
+                      >
+                        Explore All in Catalog →
+                      </Link>
+                    </div>
+
+                    <RecommendedProductsSection
+                      products={
+                        recommendationData?.formattedProducts ||
+                        recommendationData?.selectedProducts?.map((sp) => {
+                          const prod = sp.product || {};
+                          return {
+                            productId: prod._id || prod.id,
+                            name: prod.name,
+                            brand: prod.brand,
+                            imageUrl: prod.imageUrl,
+                            category: prod.category,
+                            price: prod.price,
+                            relevantConcern: sp.targetedConcerns?.[0] || 'Skin Health',
+                            reason: sp.primaryReason,
+                            ingredients: prod.ingredients || [],
+                            applicationInstructions: prod.usageInstructions || sp.usageTip,
+                            warnings: prod.warnings || [],
+                            productUrl: prod.productUrl,
+                            matchScore: sp.matchScore,
+                            timeOfDay: sp.timeOfDay,
+                          };
+                        }) || []
+                      }
+                      onSelectProduct={(p) => setSelectedProduct(p)}
+                      loading={loadingRecommendations}
+                    />
+                  </div>
+
+                  {/* Footer Banner */}
+                  <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#E8DFD8] flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                    <div>
+                      <h4 className="text-xs font-bold text-[#2B2623]">Want to track your routine history over time?</h4>
+                      <p className="text-[11px] text-[#7A7069]">DermaVision saves every scan and routine to your personal patient profile.</p>
+                    </div>
+                    <Link
+                      to="/recommendations"
+                      className="px-4 py-2 rounded-xl bg-[#2B2623] hover:bg-black text-white text-xs font-bold transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+                    >
+                      <HiOutlineSparkles className="text-sm text-[#DC926E]" />
+                      <span>Open Recommendations Dashboard</span>
+                    </Link>
+                  </div>
+                </div>
+              )}
 
               {/* ══ TAB: DARK CIRCLES (ESTIMATED PHYSICAL SEVERITY) ══════════════ */}
               {activeTab === "darkCircles" && (
@@ -2237,6 +3080,23 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                         {analysisResult.disclaimer || "Estimated Severity represents an application-defined visual estimate based on localized contrast and affected area. These scores are cosmetic visual indicators and do NOT constitute a medical diagnosis or clinical grading."}
                       </p>
                     </div>
+                  </div>
+
+                  {/* Jump to Care Regimen Banner */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-[#FAF1EC] to-white border border-[#EFCAAD] flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#DC926E] bg-white px-2 py-0.5 rounded border border-[#EFCAAD]">
+                        Targeted Clinical Care
+                      </span>
+                      <p className="text-xs text-[#2B2623] font-bold mt-1">Ready to treat under-eye dark circles with curated formulations?</p>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab("recommendations")}
+                      className="px-4 py-2 rounded-xl bg-[#2B2623] hover:bg-black text-white text-xs font-bold transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+                    >
+                      <span>View Curated Care &amp; Routine</span>
+                      <HiArrowRight className="text-[#DC926E]" />
+                    </button>
                   </div>
                 </div>
               )}
@@ -2567,6 +3427,23 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                     </div>
                   </div>
                   </>)}
+
+                  {/* Jump to Care Regimen Banner */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-[#FAF1EC] to-white border border-[#EFCAAD] flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#DC926E] bg-white px-2 py-0.5 rounded border border-[#EFCAAD]">
+                        Targeted Clinical Care
+                      </span>
+                      <p className="text-xs text-[#2B2623] font-bold mt-1">Ready to soothe vascular redness &amp; restore barrier resilience?</p>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab("recommendations")}
+                      className="px-4 py-2 rounded-xl bg-[#2B2623] hover:bg-black text-white text-xs font-bold transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+                    >
+                      <span>View Curated Care &amp; Routine</span>
+                      <HiArrowRight className="text-[#DC926E]" />
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -2707,27 +3584,345 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                     </div>
                   </div>
 
-                  {/* 3. Pore Dilation & Clarity Index */}
-                  <div className="bg-[#FAF8F5] border border-[#E8DFD8] rounded-2xl p-4 sm:p-5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-extrabold uppercase tracking-wider text-[11px] text-[#2B2623]">
-                        Pore Dilation &amp; Sebaceous Clarity
-                      </span>
-                      <span className="text-xs font-bold text-[#2B2623] bg-white px-2.5 py-1 rounded-md border border-[#E8DFD8]">
-                        Pore Level: {analysisResult.acne.poreScore ?? 35}%
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
-                        <span className="text-[10px] font-bold uppercase text-[#7A7069] block mb-1">Pore Type</span>
-                        <p className="text-xs font-semibold text-[#2B2623]">{analysisResult.acne.poreType || "Minimal Pore Dilation"}</p>
+                  {/* 3. Cheek-Only Visible Pores Telemetry */}
+                  {(() => {
+                    const pores = analysisResult.acne.pores || {
+                      leftCheek: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+                      rightCheek: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+                      overall: { visiblePoreDensity: null, estimatedCount: null, confidence: "uncertain" },
+                      analyzedRegions: ["left_cheek", "right_cheek"],
+                      excludedRegions: ["nose", "forehead", "chin", "under_eye"],
+                    };
+                    const isUncertain = pores.overall?.confidence === "uncertain" || pores.overall?.visiblePoreDensity === null;
+                    const confLabel = isUncertain ? "Uncertain / Low Quality" : pores.overall?.confidence === "high" ? "High Confidence" : "Moderate Confidence";
+                    const confColor = isUncertain ? "#D97706" : pores.overall?.confidence === "high" ? "#10B981" : "#F59E0B";
+                    const confBg = isUncertain ? "#FEF3C7" : pores.overall?.confidence === "high" ? "#ECFDF5" : "#FFFBEB";
+
+                    const leftCheekPolyStr = pores.debug?.leftCheekPolygon
+                      ? pores.debug.leftCheekPolygon.map((p) => `${p.x},${p.y}`).join(" ")
+                      : "19,44 38,44 39,62 24,66 18,55";
+                    const rightCheekPolyStr = pores.debug?.rightCheekPolygon
+                      ? pores.debug.rightCheekPolygon.map((p) => `${p.x},${p.y}`).join(" ")
+                      : "62,44 81,44 82,55 76,66 61,62";
+                    const nosePolyStr = pores.debug?.excludedNosePolygon
+                      ? pores.debug.excludedNosePolygon.map((p) => `${p.x},${p.y}`).join(" ")
+                      : "42,35 58,35 62,60 38,60";
+                    const candidatePores = pores.debug?.candidatePoreLocations || [];
+
+                    return (
+                      <div className="bg-[#FAF8F5] border-2 border-[#E8DFD8] rounded-2xl p-4 sm:p-5 space-y-4">
+                        {/* Section Header */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-2 border-b border-[#E8DFD8]">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">🔬</span>
+                              <span className="font-extrabold uppercase tracking-wider text-[11px] text-[#2B2623]">
+                                Cheek-Only Visible Pores Analysis
+                              </span>
+                              <span
+                                className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md"
+                                style={{ backgroundColor: confBg, color: confColor }}
+                              >
+                                {confLabel}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#7A7069] mt-0.5">
+                              Exclusively analyzed on Left &amp; Right Malar/Buccal Cheeks • Excluded: Nose, Forehead, Chin, Under-Eye
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 self-start sm:self-auto">
+                            <button
+                              onClick={() => setShowPoresDebug((prev) => !prev)}
+                              className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 shadow-xs"
+                              style={{
+                                backgroundColor: showPoresDebug ? "#2B2623" : "#FFFFFF",
+                                color: showPoresDebug ? "#FFFFFF" : "#2B2623",
+                                borderColor: showPoresDebug ? "#2B2623" : "#E8DFD8",
+                              }}
+                            >
+                              <span>🔬</span>
+                              <span>{showPoresDebug ? "Hide Pores Debugger" : "Show Pores Debugger"}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 3 Telemetry Metrics Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {/* Left Cheek */}
+                          <div className="bg-white p-3.5 rounded-xl border border-[#E8DFD8] space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#7A7069]">
+                                Left Cheek ROI
+                              </span>
+                              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-800 border border-cyan-200">
+                                Analyzed
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between">
+                              <span className="text-2xl font-black text-[#2B2623]">
+                                {pores.leftCheek?.visiblePoreDensity !== null && pores.leftCheek?.visiblePoreDensity !== undefined
+                                  ? `${pores.leftCheek.visiblePoreDensity}`
+                                  : "Uncertain"}
+                              </span>
+                              {pores.leftCheek?.visiblePoreDensity !== null && (
+                                <span className="text-[10px] font-bold text-[#7A7069]">Density Index</span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-[#5A524C] flex justify-between border-t border-[#F0E8E2] pt-1.5">
+                              <span>Estimated Visible Pores:</span>
+                              <strong className="text-[#2B2623]">
+                                {pores.leftCheek?.estimatedCount !== null && pores.leftCheek?.estimatedCount !== undefined
+                                  ? `${pores.leftCheek.estimatedCount} spots`
+                                  : "—"}
+                              </strong>
+                            </div>
+                          </div>
+
+                          {/* Right Cheek */}
+                          <div className="bg-white p-3.5 rounded-xl border border-[#E8DFD8] space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#7A7069]">
+                                Right Cheek ROI
+                              </span>
+                              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-800 border border-cyan-200">
+                                Analyzed
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between">
+                              <span className="text-2xl font-black text-[#2B2623]">
+                                {pores.rightCheek?.visiblePoreDensity !== null && pores.rightCheek?.visiblePoreDensity !== undefined
+                                  ? `${pores.rightCheek.visiblePoreDensity}`
+                                  : "Uncertain"}
+                              </span>
+                              {pores.rightCheek?.visiblePoreDensity !== null && (
+                                <span className="text-[10px] font-bold text-[#7A7069]">Density Index</span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-[#5A524C] flex justify-between border-t border-[#F0E8E2] pt-1.5">
+                              <span>Estimated Visible Pores:</span>
+                              <strong className="text-[#2B2623]">
+                                {pores.rightCheek?.estimatedCount !== null && pores.rightCheek?.estimatedCount !== undefined
+                                  ? `${pores.rightCheek.estimatedCount} spots`
+                                  : "—"}
+                              </strong>
+                            </div>
+                          </div>
+
+                          {/* Combined Overall */}
+                          <div className="bg-white p-3.5 rounded-xl border border-[#E8DFD8] space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#7A7069]">
+                                Combined Cheek Result
+                              </span>
+                              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-[#FAF1EC] text-[#DC926E] border border-[#EFCAAD]">
+                                Overall
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between">
+                              <span className="text-2xl font-black text-[#2B2623]">
+                                {pores.overall?.visiblePoreDensity !== null && pores.overall?.visiblePoreDensity !== undefined
+                                  ? `${pores.overall.visiblePoreDensity}`
+                                  : "Uncertain"}
+                              </span>
+                              {pores.overall?.visiblePoreDensity !== null && (
+                                <span className="text-[10px] font-bold text-[#7A7069]">/ 100 Calibrated</span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-[#5A524C] flex justify-between border-t border-[#F0E8E2] pt-1.5">
+                              <span>Total Pores Counted:</span>
+                              <strong className="text-[#2B2623]">
+                                {pores.overall?.estimatedCount !== null && pores.overall?.estimatedCount !== undefined
+                                  ? `${pores.overall.estimatedCount} pores`
+                                  : "—"}
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Optical Quality & Clinical Integrity Notice */}
+                        {isUncertain ? (
+                          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5">
+                            <span className="text-base shrink-0">⚠️</span>
+                            <div>
+                              <strong className="font-bold">Image Resolution / Focus Diagnostic:</strong>
+                              <p className="mt-0.5 leading-relaxed text-amber-800">
+                                {pores.diagnosticNote || "Cheek regions exhibit focus blur or compression artifacts. Under clinical standards, DermaVision does not invent or guess pore counts when optical micro-sharpness is insufficient to distinguish true follicular apertures from digital noise."}
+                              </p>
+                              <p className="mt-1 text-[11px] font-mono text-amber-700">
+                                Cheek Sharpness Score: {pores.sharpnessScore ?? "Low"} (Threshold: 18.0 minimum required)
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2.5">
+                            <span className="text-base shrink-0">✓</span>
+                            <div className="leading-relaxed">
+                              <strong>Clinical Distinction Applied:</strong> Detected follicular pore candidates were validated via Morphological Black Top-Hat transforms. Acne papules, inflammatory pustules, open comedones (blackheads), pitted scars, and facial creases were evaluated and explicitly excluded from pore counts.
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Anatomical Region Partitioning Breakdown */}
+                        <div className="bg-white p-3 rounded-xl border border-[#E8DFD8] text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-cyan-500" />
+                              <span className="text-[#5A524C]">Analyzed Regions:</span>
+                              <strong className="text-[#2B2623]">Left Cheek (Malar), Right Cheek (Malar)</strong>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-red-400" />
+                              <span className="text-[#5A524C]">Excluded Non-Cheek Regions:</span>
+                              <strong className="text-red-700">Nose, Nose Sides, Forehead, Chin, Under-Eye, Lips</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Optional Visual Debugger Viewport */}
+                        {showPoresDebug && (
+                          <div className="bg-neutral-900 text-white rounded-2xl p-4 space-y-3 border border-neutral-700 animate-fadeIn">
+                            <div className="flex items-center justify-between border-b border-neutral-700 pb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-cyan-400 font-mono text-xs">●</span>
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-200">
+                                  Visual Debug Mode: Cheek ROIs &amp; Candidate Pore Telemetry
+                                </h4>
+                              </div>
+                              <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">
+                                {candidatePores.length} Candidates Located
+                              </span>
+                            </div>
+
+                            <div className="flex flex-col lg:flex-row items-center gap-4">
+                              {/* Visual Canvas Container */}
+                              <div className="relative w-full max-w-[280px] sm:max-w-[320px] mx-auto rounded-2xl overflow-hidden shadow-xl border border-neutral-700 bg-black shrink-0">
+                                {capturedImage ? (
+                                  <img
+                                    src={capturedImage}
+                                    alt="Cheek Pores Debug"
+                                    className="w-full h-auto block select-none pointer-events-none"
+                                  />
+                                ) : (
+                                  <div className="w-full aspect-square bg-neutral-800 flex items-center justify-center text-xs text-neutral-400">
+                                    No scan image available
+                                  </div>
+                                )}
+
+                                {/* Debug SVG Overlays */}
+                                <svg
+                                  className="absolute inset-0 w-full h-full pointer-events-none"
+                                  viewBox="0 0 100 100"
+                                  preserveAspectRatio="none"
+                                >
+                                  {/* Left Cheek ROI (Cyan translucent wash) */}
+                                  <polygon
+                                    points={leftCheekPolyStr}
+                                    fill="rgba(6, 182, 212, 0.22)"
+                                    stroke="#06B6D4"
+                                    strokeWidth="1.4"
+                                  />
+
+                                  {/* Right Cheek ROI (Cyan translucent wash) */}
+                                  <polygon
+                                    points={rightCheekPolyStr}
+                                    fill="rgba(6, 182, 212, 0.22)"
+                                    stroke="#06B6D4"
+                                    strokeWidth="1.4"
+                                  />
+
+                                  {/* Excluded Nose Region (Red dashed outline) */}
+                                  <polygon
+                                    points={nosePolyStr}
+                                    fill="rgba(239, 68, 68, 0.18)"
+                                    stroke="#EF4444"
+                                    strokeWidth="1.2"
+                                    strokeDasharray="2,2"
+                                  />
+
+                                  {/* Detected Candidate Pore Circles */}
+                                  {candidatePores.map((p, idx) => (
+                                    <g key={`pore-cand-${idx}`}>
+                                      <circle
+                                        cx={`${p.x}%`}
+                                        cy={`${p.y}%`}
+                                        r={p.radius || 1.6}
+                                        fill="#06B6D4"
+                                        opacity="0.9"
+                                      />
+                                      <circle
+                                        cx={`${p.x}%`}
+                                        cy={`${p.y}%`}
+                                        r={(p.radius || 1.6) + 1.2}
+                                        fill="none"
+                                        stroke="#22D3EE"
+                                        strokeWidth="0.6"
+                                        strokeDasharray="1,1"
+                                      />
+                                    </g>
+                                  ))}
+                                </svg>
+
+                                {/* Labels inside canvas */}
+                                <div className="absolute top-2 left-2 text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-900/90 text-cyan-200 border border-cyan-500/40">
+                                  L.Cheek ROI
+                                </div>
+                                <div className="absolute top-2 right-2 text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-900/90 text-cyan-200 border border-cyan-500/40">
+                                  R.Cheek ROI
+                                </div>
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-red-950/90 text-red-300 border border-red-500/40">
+                                  Excluded (Nose)
+                                </div>
+                              </div>
+
+                              {/* Telemetry Legend & Diagnostic HUD */}
+                              <div className="w-full text-xs space-y-2.5">
+                                <div className="bg-neutral-800/80 p-3 rounded-xl border border-neutral-700 space-y-1.5">
+                                  <span className="font-bold text-neutral-300 text-[11px] block">Overlay Color Legend:</span>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10px] text-neutral-300 font-mono">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-3 h-3 rounded bg-cyan-500/30 border border-cyan-400" />
+                                      <span>Cyan Poly = Cheek Analyzed ROI</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-3 h-3 rounded bg-red-500/30 border border-red-400 border-dashed" />
+                                      <span>Red Dashed = Excluded Nose Area</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
+                                      <span>Cyan Dots = Candidate Pores</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                                      <span>Adaptive Orientation Active</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="bg-neutral-800/80 p-3 rounded-xl border border-neutral-700 space-y-1 text-[11px] text-neutral-300 leading-relaxed font-mono">
+                                  <p><strong>• Left Cheek Pores:</strong> {pores.leftCheek?.estimatedCount ?? "N/A"}</p>
+                                  <p><strong>• Right Cheek Pores:</strong> {pores.rightCheek?.estimatedCount ?? "N/A"}</p>
+                                  <p><strong>• Laplacian Sharpness:</strong> {pores.sharpnessScore ?? "N/A"}</p>
+                                  <p><strong>• Non-Cheek Leakage:</strong> 0% (Strict polygon subtraction)</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Existing Pore Type & Care Protocol Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                          <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
+                            <span className="text-[10px] font-bold uppercase text-[#7A7069] block mb-1">Pore Type</span>
+                            <p className="text-xs font-semibold text-[#2B2623]">{analysisResult.acne.poreType || "Minimal Pore Dilation"}</p>
+                          </div>
+                          <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
+                            <span className="text-[10px] font-bold uppercase text-[#7A7069] block mb-1">Pore Care Protocol</span>
+                            <p className="text-xs font-semibold text-[#2B2623]">{analysisResult.acne.poreTreatment || "Daily Gentle Hydration + Mineral SPF 50"}</p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
-                        <span className="text-[10px] font-bold uppercase text-[#7A7069] block mb-1">Pore Care Protocol</span>
-                        <p className="text-xs font-semibold text-[#2B2623]">{analysisResult.acne.poreTreatment || "Daily Gentle Hydration + Mineral SPF 50"}</p>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   {/* 4. Clinical Protocol & Targeted Routine */}
                   <div className="bg-white border border-[#E8DFD8] rounded-2xl p-4 sm:p-5 space-y-3">
@@ -2747,6 +3942,23 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                         <p>Double-cleanse pore openings, apply active treatment (Salicylic / Retinoid / Azelaic Acid), seal with barrier ceramide cream.</p>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Jump to Care Regimen Banner */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-[#FAF1EC] to-white border border-[#EFCAAD] flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#DC926E] bg-white px-2 py-0.5 rounded border border-[#EFCAAD]">
+                        Targeted Clinical Care
+                      </span>
+                      <p className="text-xs text-[#2B2623] font-bold mt-1">Ready to treat acne lesions and unclog congested pores?</p>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab("recommendations")}
+                      className="px-4 py-2 rounded-xl bg-[#2B2623] hover:bg-black text-white text-xs font-bold transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+                    >
+                      <span>View Curated Care &amp; Routine</span>
+                      <HiArrowRight className="text-[#DC926E]" />
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -2797,6 +4009,14 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                         </button>
                       )}
                       <button
+                        onClick={() => setFaceMapMode("pores")}
+                        className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                          faceMapMode === "pores" ? "bg-white text-cyan-700 shadow-xs ring-1 ring-cyan-300 font-extrabold" : "text-[#7A7069] hover:text-[#2B2623]"
+                        }`}
+                      >
+                        <span>🔬</span> Pores
+                      </button>
+                      <button
                         onClick={() => setShowMarkers((p) => !p)}
                         className="px-2 py-1 ml-1 text-xs text-[#5A524C] hover:text-black transition-colors cursor-pointer border-l border-[#E8DFD8]"
                         title={showMarkers ? "Hide markings" : "Show markings"}
@@ -2827,7 +4047,7 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                       )}
 
                       {/* Anatomically Registered SVG Polygons (Strictly Clustered to True Facial Contours) */}
-                      {showMarkers && (faceMapMode === "zones" || faceMapMode === "all") && (
+                      {showMarkers && (faceMapMode === "zones" || faceMapMode === "all" || faceMapMode === "pores") && (
                         <svg
                           className="absolute inset-0 w-full h-full pointer-events-none"
                           viewBox="0 0 100 100"
@@ -2863,6 +4083,59 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                               <feComposite in="SourceGraphic" in2="blur" operator="over" />
                             </filter>
                           </defs>
+
+                          {/* Dedicated Cheek-Only Pores Mode Overlays */}
+                          {faceMapMode === "pores" && (
+                            <>
+                              <polygon
+                                points={analysisResult.acne?.pores?.debug?.leftCheekPolygon
+                                  ? analysisResult.acne.pores.debug.leftCheekPolygon.map((p) => `${p.x},${p.y}`).join(" ")
+                                  : "19,44 38,44 39,62 24,66 18,55"}
+                                fill="rgba(6, 182, 212, 0.25)"
+                                stroke="#06B6D4"
+                                strokeWidth="1.6"
+                                filter="url(#glow)"
+                              />
+                              <polygon
+                                points={analysisResult.acne?.pores?.debug?.rightCheekPolygon
+                                  ? analysisResult.acne.pores.debug.rightCheekPolygon.map((p) => `${p.x},${p.y}`).join(" ")
+                                  : "62,44 81,44 82,55 76,66 61,62"}
+                                fill="rgba(6, 182, 212, 0.25)"
+                                stroke="#06B6D4"
+                                strokeWidth="1.6"
+                                filter="url(#glow)"
+                              />
+                              <polygon
+                                points={analysisResult.acne?.pores?.debug?.excludedNosePolygon
+                                  ? analysisResult.acne.pores.debug.excludedNosePolygon.map((p) => `${p.x},${p.y}`).join(" ")
+                                  : "42,35 58,35 62,60 38,60"}
+                                fill="rgba(239, 68, 68, 0.16)"
+                                stroke="#EF4444"
+                                strokeWidth="1.2"
+                                strokeDasharray="2,2"
+                              />
+                              {analysisResult.acne?.pores?.debug?.candidatePoreLocations?.map((p, idx) => (
+                                <g key={`cand-pore-map-${idx}`}>
+                                  <circle
+                                    cx={`${p.x}%`}
+                                    cy={`${p.y}%`}
+                                    r={p.radius || 1.6}
+                                    fill="#06B6D4"
+                                    opacity="0.95"
+                                  />
+                                  <circle
+                                    cx={`${p.x}%`}
+                                    cy={`${p.y}%`}
+                                    r={(p.radius || 1.6) + 1.2}
+                                    fill="none"
+                                    stroke="#22D3EE"
+                                    strokeWidth="0.6"
+                                    strokeDasharray="1,1"
+                                  />
+                                </g>
+                              ))}
+                            </>
+                          )}
 
                           {/* Dark Circle Sub-Orbital Contours (Left & Right Tear Troughs) */}
                           <polygon
@@ -2937,63 +4210,90 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                       )}
 
                       {/* Precise Dynamic Centroid Badges (Positioned Directly Over the Actual Feature) */}
-                      {showMarkers && (faceMapMode === "zones" || faceMapMode === "all") && (
+                      {showMarkers && (
                         <>
-                          {/* Dark Circle Sub-Orbital Labels */}
-                          {(() => {
-                            const leftC = getCentroidFromPoints(analysisResult.regions?.left);
-                            const rightC = getCentroidFromPoints(analysisResult.regions?.right);
-                            return (
-                              <>
-                                {leftC && (
-                                  <div
-                                    className="absolute text-[8px] font-mono font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap text-white bg-[#DC926E]/95 pointer-events-none -translate-x-1/2 -translate-y-1/2 border border-white/20"
-                                    style={{ left: `${leftC.x}%`, top: `${Math.max(4, leftC.y - 4)}%` }}
-                                  >
-                                    L. Eye (ΔL*)
-                                  </div>
-                                )}
-                                {rightC && (
-                                  <div
-                                    className="absolute text-[8px] font-mono font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap text-white bg-[#DC926E]/95 pointer-events-none -translate-x-1/2 -translate-y-1/2 border border-white/20"
-                                    style={{ left: `${rightC.x}%`, top: `${Math.max(4, rightC.y - 4)}%` }}
-                                  >
-                                    R. Eye (ΔL*)
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-
-                          {/* 5 Facial Zones Centroid Badges */}
-                          {[
-                            { key: "forehead", zoneKey: "forehead", label: "Forehead" },
-                            { key: "leftCheek", zoneKey: "leftCheek", label: "L.Cheek" },
-                            { key: "rightCheek", zoneKey: "rightCheek", label: "R.Cheek" },
-                            { key: "chin", zoneKey: "chin", label: "Chin" },
-                            { key: "noseTip", zoneKey: "nose", label: "Nose" },
-                          ].map(({ key, zoneKey, label }) => {
-                            const pts = analysisResult.redness?.regions?.[key];
-                            const c = getCentroidFromPoints(pts);
-                            if (!c) return null;
-                            const z = analysisResult.redness?.zone_redness?.[zoneKey] || { severity: "Low" };
-                            const zSev = z.severity || "Low";
-                            const bg =
-                              zSev === "High"
-                                ? "bg-red-600/95 text-white ring-1 ring-red-400"
-                                : zSev === "Moderate"
-                                ? "bg-amber-600/95 text-white ring-1 ring-amber-400"
-                                : "bg-emerald-600/90 text-white ring-1 ring-emerald-400";
-                            return (
+                          {faceMapMode === "pores" && (
+                            <>
                               <div
-                                key={zoneKey}
-                                className={`absolute text-[8px] font-mono font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap pointer-events-none -translate-x-1/2 -translate-y-1/2 border border-white/20 ${bg}`}
-                                style={{ left: `${c.x}%`, top: `${c.y}%` }}
+                                className="absolute text-[8px] font-mono font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap text-white bg-cyan-700/95 pointer-events-none -translate-x-1/2 -translate-y-1/2 border border-white/20"
+                                style={{ left: "28%", top: "54%" }}
                               >
-                                {label}: {zSev}
+                                L. Cheek: {analysisResult.acne?.pores?.leftCheek?.visiblePoreDensity ?? "—"}%
                               </div>
-                            );
-                          })}
+                              <div
+                                className="absolute text-[8px] font-mono font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap text-white bg-cyan-700/95 pointer-events-none -translate-x-1/2 -translate-y-1/2 border border-white/20"
+                                style={{ left: "72%", top: "54%" }}
+                              >
+                                R. Cheek: {analysisResult.acne?.pores?.rightCheek?.visiblePoreDensity ?? "—"}%
+                              </div>
+                              <div
+                                className="absolute text-[8px] font-mono font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap text-white bg-red-700/95 pointer-events-none -translate-x-1/2 -translate-y-1/2 border border-white/20"
+                                style={{ left: "50%", top: "48%" }}
+                              >
+                                Excluded (Nose)
+                              </div>
+                            </>
+                          )}
+
+                          {(faceMapMode === "zones" || faceMapMode === "all") && (
+                            <>
+                              {/* Dark Circle Sub-Orbital Labels */}
+                              {(() => {
+                                const leftC = getCentroidFromPoints(analysisResult.regions?.left);
+                                const rightC = getCentroidFromPoints(analysisResult.regions?.right);
+                                return (
+                                  <>
+                                    {leftC && (
+                                      <div
+                                        className="absolute text-[8px] font-mono font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap text-white bg-[#DC926E]/95 pointer-events-none -translate-x-1/2 -translate-y-1/2 border border-white/20"
+                                        style={{ left: `${leftC.x}%`, top: `${Math.max(4, leftC.y - 4)}%` }}
+                                      >
+                                        L. Eye (ΔL*)
+                                      </div>
+                                    )}
+                                    {rightC && (
+                                      <div
+                                        className="absolute text-[8px] font-mono font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap text-white bg-[#DC926E]/95 pointer-events-none -translate-x-1/2 -translate-y-1/2 border border-white/20"
+                                        style={{ left: `${rightC.x}%`, top: `${Math.max(4, rightC.y - 4)}%` }}
+                                      >
+                                        R. Eye (ΔL*)
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+
+                              {/* 5 Facial Zones Centroid Badges */}
+                              {[
+                                { key: "forehead", zoneKey: "forehead", label: "Forehead" },
+                                { key: "leftCheek", zoneKey: "leftCheek", label: "L.Cheek" },
+                                { key: "rightCheek", zoneKey: "rightCheek", label: "R.Cheek" },
+                                { key: "chin", zoneKey: "chin", label: "Chin" },
+                                { key: "noseTip", zoneKey: "nose", label: "Nose" },
+                              ].map(({ key, zoneKey, label }) => {
+                                const pts = analysisResult.redness?.regions?.[key];
+                                const c = getCentroidFromPoints(pts);
+                                if (!c) return null;
+                                const z = analysisResult.redness?.zone_redness?.[zoneKey] || { severity: "Low" };
+                                const zSev = z.severity || "Low";
+                                const bg =
+                                  zSev === "High"
+                                    ? "bg-red-600/95 text-white ring-1 ring-red-400"
+                                    : zSev === "Moderate"
+                                    ? "bg-amber-600/95 text-white ring-1 ring-amber-400"
+                                    : "bg-emerald-600/90 text-white ring-1 ring-emerald-400";
+                                return (
+                                  <div
+                                    key={zoneKey}
+                                    className={`absolute text-[8px] font-mono font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap pointer-events-none -translate-x-1/2 -translate-y-1/2 border border-white/20 ${bg}`}
+                                    style={{ left: `${c.x}%`, top: `${c.y}%` }}
+                                  >
+                                    {label}: {zSev}
+                                  </div>
+                                );
+                              })}
+                            </>
+                          )}
                         </>
                       )}
                     </div>
@@ -3015,6 +4315,9 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                     </span>
                     <span className="flex items-center gap-1.5 font-semibold text-[#EF4444]">
                       <span className="w-2.5 h-2.5 rounded-full border-2 border-[#EF4444] bg-[#EF4444]/40" /> Acne Blemish
+                    </span>
+                    <span className="flex items-center gap-1.5 font-semibold text-cyan-600">
+                      <span className="w-3 h-3 rounded-sm bg-cyan-500/30 border border-cyan-400" /> Cheek Pores ROI
                     </span>
                     {analysisResult.redness?.visualization && (
                       <span className="flex items-center gap-1.5 font-semibold text-rose-600">
@@ -3043,9 +4346,18 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
                   </button>
                   <button
                     onClick={() => setShowReportModal(true)}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-xs font-bold px-5 py-2.5 rounded-xl bg-[#DC926E] hover:bg-[#c87e5b] text-white shadow-sm transition-all cursor-pointer"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl bg-[#DC926E] hover:bg-[#c87e5b] text-white shadow-sm transition-all cursor-pointer"
                   >
                     <HiOutlineDocumentReport className="text-sm" /><span>View &amp; Print Clinical Report</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab("recommendations");
+                      window.scrollTo({ top: 300, behavior: 'smooth' });
+                    }}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl bg-[#2B2623] hover:bg-black text-white shadow-sm transition-all cursor-pointer"
+                  >
+                    <HiOutlineSparkles className="text-sm text-[#DC926E]" /><span>View Recommended Products &amp; Routine</span>
                   </button>
                 </div>
               </div>
@@ -3071,6 +4383,23 @@ const SkinAnalysis = ({ initialTab = "darkCircles" }) => {
             isOpen={showReportModal}
             onClose={() => setShowReportModal(false)}
             reportData={buildReportData({ source: "skin-analysis", analysisResult, user, capturedImage })}
+          />
+        )}
+
+        {/* Product Quick-View Modal */}
+        {selectedProduct && (
+          <ProductQuickViewModal
+            product={selectedProduct}
+            onClose={() => setSelectedProduct(null)}
+          />
+        )}
+
+        {/* Floating Toast Notification */}
+        {toast && (
+          <ToastNotification
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
           />
         )}
 

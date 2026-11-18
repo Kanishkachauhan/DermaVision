@@ -5,7 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
  * Shared fetch wrapper for backend API requests
  */
 export async function apiRequest(endpoint, options = {}) {
-  const token = localStorage.getItem('dermavision_token');
+  let token = localStorage.getItem('dermavision_token');
 
   const headers = {
     'Content-Type': 'application/json',
@@ -20,8 +20,39 @@ export async function apiRequest(endpoint, options = {}) {
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    const data = await response.json().catch(() => ({}));
+    let response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    let data = await response.json().catch(() => ({}));
+
+    // If 401 Unauthorized and not already retrying, attempt token refresh
+    if (response.status === 401 && !options._isRetry) {
+      try {
+        const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const refreshData = await refreshRes.json().catch(() => ({}));
+        if (refreshRes.ok && refreshData.accessToken) {
+          localStorage.setItem('dermavision_token', refreshData.accessToken);
+          if (refreshData.user) {
+            localStorage.setItem('dermavision_user', JSON.stringify(refreshData.user));
+          }
+          // Retry request with fresh token
+          const retryHeaders = {
+            ...headers,
+            Authorization: `Bearer ${refreshData.accessToken}`,
+          };
+          response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            ...config,
+            headers: retryHeaders,
+            _isRetry: true,
+          });
+          data = await response.json().catch(() => ({}));
+        }
+      } catch (rErr) {
+        // Silently continue to original error handling
+      }
+    }
 
     if (!response.ok) {
       const errorMsg =
@@ -81,6 +112,92 @@ export async function analyzeRednessApi(payload) {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+/**
+ * Send cheek pore analysis to backend → forwarded to Morphological Black Top-Hat microservice
+ */
+export async function analyzePoresApi(payload) {
+  return apiRequest('/analysis/pores', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+// ─── Personalized Recommendation & Routine APIs ──────────────────────────────
+
+export async function fetchMyRecommendations(page = 1, limit = 10) {
+  return apiRequest(`/recommendations/my?page=${page}&limit=${limit}`);
+}
+
+export async function fetchRecommendationForReport(reportId) {
+  return apiRequest(`/recommendations/report/${encodeURIComponent(reportId)}`);
+}
+
+export async function generateRecommendationsApi(payload) {
+  return apiRequest('/recommendations/generate', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function evaluateRecommendationsApi(payload) {
+  return apiRequest('/recommendations/evaluate', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchActiveRoutineApi() {
+  return apiRequest('/routines/active');
+}
+
+export async function fetchTodayRoutineStatusApi(routineId, date = '') {
+  const query = date ? `?date=${encodeURIComponent(date)}` : '';
+  return apiRequest(`/routines/${encodeURIComponent(routineId)}/today${query}`);
+}
+
+export async function activateRoutineApi(routineId) {
+  return apiRequest(`/routines/${encodeURIComponent(routineId)}/activate`, {
+    method: 'PATCH',
+  });
+}
+
+export async function completeRoutineStepApi(routineId, payload) {
+  return apiRequest(`/routines/${encodeURIComponent(routineId)}/complete-step`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function toggleProductPauseApi(routineId, productId, isPaused) {
+  return apiRequest(
+    `/routines/${encodeURIComponent(routineId)}/products/${encodeURIComponent(productId)}/pause`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ isPaused }),
+    }
+  );
+}
+
+export async function removeProductFromRoutineApi(routineId, productId) {
+  return apiRequest(
+    `/routines/${encodeURIComponent(routineId)}/products/${encodeURIComponent(productId)}`,
+    {
+      method: 'DELETE',
+    }
+  );
+}
+
+export async function regenerateRoutineApi(routineId, recommendationId) {
+  return apiRequest(`/routines/${encodeURIComponent(routineId)}/regenerate`, {
+    method: 'POST',
+    body: JSON.stringify({ recommendationId }),
+  });
+}
+
+export async function fetchMyReportsApi(page = 1, limit = 5) {
+  return apiRequest(`/reports?page=${page}&limit=${limit}`);
 }
 
 // ─── Overpass / OpenStreetMap Free API Integration ──────────────────────────

@@ -11,6 +11,7 @@ import SkinAnalysis from "./pages/SkinAnalysis";
 import FindDermatologists from "./pages/FindDermatologists";
 import Products from "./pages/Products";
 import ProductDetails from "./pages/ProductDetails";
+import RecommendationsDashboard from "./pages/RecommendationsDashboard";
 import AdminDoctors from "./pages/AdminDoctors";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -98,6 +99,19 @@ const App = () => (
           }
         />
         <Route path="/product"             element={<Navigate to="/products" replace />} />
+        <Route
+          path="/recommendations"
+          element={
+            <ProtectedRoute message="Please log in to view your personalized skincare recommendations.">
+              <MainLayout>
+                <ErrorBoundary>
+                  <RecommendationsDashboard />
+                </ErrorBoundary>
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/routine"             element={<Navigate to="/recommendations?tab=routine" replace />} />
         <Route
           path="/analysis"
           element={
