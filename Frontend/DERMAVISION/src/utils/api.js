@@ -83,6 +83,16 @@ export async function analyzeRednessApi(payload) {
   });
 }
 
+/**
+ * Send facial pigmentation & melasma analysis to backend AI service
+ */
+export async function analyzePigmentationApi(payload) {
+  return apiRequest('/analysis/pigmentation', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 // ─── Overpass / OpenStreetMap Free API Integration ──────────────────────────
 
 const OVERPASS_MIRRORS = [

@@ -100,6 +100,13 @@ const Technology = () => {
       heroIngredients: ["Hyaluronic Acid", "Glycerin", "Vitamin C"],
       outcome: "Bounces back skin radiance and keeps moisture locked all day.",
     },
+    {
+      concern: "If Dark Spots or Pigmentation are Detected",
+      tag: "Brightening Match",
+      rule: "We prioritize tyrosinase-moderating actives and daily photoprotection that fade spots gently.",
+      heroIngredients: ["Niacinamide (5%)", "Vitamin C", "Alpha Arbutin", "Azelaic Acid", "SPF 50+"],
+      outcome: "Restores even skin tone and protects against UV melanogenesis.",
+    },
   ];
 
   // Dermatologist recommendation flow
@@ -438,7 +445,7 @@ const Technology = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {productMatchingRules.map((card, idx) => (
                 <div
                   key={idx}

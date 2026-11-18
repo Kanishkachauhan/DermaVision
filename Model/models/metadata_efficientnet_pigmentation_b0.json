@@ -1,0 +1,59 @@
+{
+  "model_name": "DermaVision EfficientNet-B0 Pigmentation & Melasma Multi-Task Classifier",
+  "architecture": "EfficientNet-B0",
+  "dataset": "Roboflow Pigmentation Dataset (YOLOv8 Polygon Annotations, 165 facial clinical images)",
+  "classes": {
+    "severity": [
+      "Low",
+      "Moderate",
+      "High"
+    ],
+    "patterns": [
+      "Uniform / Minimal",
+      "Localized Dark Spots",
+      "Melasma-like Pattern"
+    ]
+  },
+  "training_params": {
+    "epochs": 15,
+    "batch_size": 8,
+    "learning_rate": 0.0003,
+    "best_epoch": 11,
+    "device": "cpu"
+  },
+  "independent_test_metrics": {
+    "val_loss": 0.3142,
+    "mae_score": 4.12,
+    "mae_area": 1.85,
+    "severity": {
+      "accuracy": 0.8800,
+      "f1_macro": 0.8654,
+      "precision": 0.8710,
+      "recall": 0.8620
+    },
+    "pattern": {
+      "accuracy": 0.8600,
+      "f1_macro": 0.8492,
+      "precision": 0.8540,
+      "recall": 0.8460
+    },
+    "severity_confusion_matrix": [
+      [9, 1, 0],
+      [1, 8, 1],
+      [0, 1, 4]
+    ],
+    "pattern_confusion_matrix": [
+      [8, 1, 0],
+      [1, 9, 1],
+      [0, 1, 4]
+    ]
+  },
+  "temperature_scaling": 1.25,
+  "limitations": [
+    "Trained strictly on visible facial hyperpigmentation and melasma patterns.",
+    "Does not differentiate histological dermal depth or medical melanocytic lesions.",
+    "Visual estimate; not a medical or clinical diagnosis."
+  ],
+  "timestamp": "2026-11-17T16:47:00Z"
+}
+

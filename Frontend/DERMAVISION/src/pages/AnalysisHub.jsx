@@ -37,6 +37,17 @@ const AnalysisHub = () => {
       color: "#EF4444",
       bg: "#FEF2F2",
     },
+    {
+      to: "/analysis?tab=pigmentation",
+      icon: "☀️",
+      title: "Pigmentation & Melasma Analysis",
+      subtitle: "Melanin distribution & dyschromia scan",
+      description:
+        "Detects hyperpigmentation, sunspots, and melasma patterns using Individual Typology Angle (ITA°) and CIELAB melanin contrast telemetry across 5 facial anatomical zones.",
+      tags: ["Melanin Index", "ITA° Phototyping", "Melasma & Spots"],
+      color: "#D97706",
+      bg: "#FFFBEB",
+    },
   ];
 
   return (

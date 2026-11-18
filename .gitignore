@@ -28,3 +28,6 @@ venv/
 dist/
 dist-ssr/
 *.local
+
+# IDE
+.vscode/

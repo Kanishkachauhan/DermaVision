@@ -3,11 +3,16 @@ import mongoose from 'mongoose';
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI);
+    if (!process.env.MONGO_URI) {
+      console.warn('[MongoDB] Warning: MONGO_URI is not set. Continuing in offline mode...');
+      return;
+    }
+    const conn = await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+    });
     console.log(`[MongoDB] Connected: ${conn.connection.host}/${conn.connection.name}`);
   } catch (error) {
-    console.error(`[MongoDB] Connection error: ${error.message}`);
-    process.exit(1);
+    console.error(`[MongoDB] Warning: Database connection issue (${error.message}). Operating in resilient mode...`);
   }
 };
 

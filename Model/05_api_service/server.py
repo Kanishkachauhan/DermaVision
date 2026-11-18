@@ -29,6 +29,9 @@ analyze_dark_circles = dc_module.analyze_dark_circles
 redness_module = importlib.import_module("models.redness_detector")
 get_redness_detector = redness_module.get_redness_detector
 
+pigment_module = importlib.import_module("models.pigmentation_detector")
+get_pigmentation_detector = pigment_module.get_pigmentation_detector
+
 cv_filters_mod = importlib.import_module("03_preprocessing.opencv_filters")
 preprocess_dermatology_pipeline = cv_filters_mod.preprocess_dermatology_pipeline
 HAS_OPENCV = cv_filters_mod.HAS_OPENCV
@@ -57,6 +60,11 @@ def warmup_models():
         print("[Server Startup] EfficientNet-B0 & Pore detector initialized in memory.")
     except Exception as e:
         print(f"[Server Startup] Acne engine warmup warning: {e}")
+    try:
+        _ = get_pigmentation_detector("b0")
+        print("[Server Startup] EfficientNet-B0 Pigmentation & Melasma detector initialized in memory.")
+    except Exception as e:
+        print(f"[Server Startup] Pigmentation engine warmup warning: {e}")
 
 class AcneAnalysisRequest(BaseModel):
     image: Optional[str] = None
@@ -81,6 +89,14 @@ class RednessRequest(BaseModel):
     landmarks: Optional[Any] = None
     crops: Optional[Dict[str, Any]] = None
     zoneRedness: Optional[Dict[str, Any]] = None
+
+class PigmentationRequest(BaseModel):
+    image: Optional[str] = None
+    variant: Optional[str] = "b0"
+    landmarks: Optional[Any] = None
+    crops: Optional[Dict[str, Any]] = None
+    pigmentationScore: Optional[float] = None
+    zoneScores: Optional[Dict[str, Any]] = None
 
 class FullSkinRequest(BaseModel):
     image: str
@@ -152,9 +168,10 @@ def health_check():
             "acne_model": "EfficientNet-B0 / EfficientNet-B3 (Fine-Tuned)",
             "dark_circles": "MediaPipe Infraorbital CIELAB Telemetry",
             "redness": "ViT-FaceCharacteristics (varun1505/face-characteristics)",
+            "pigmentation": "EfficientNet-B0 / EfficientNet-B3 + CIELAB Melanin Index",
             "device": device
         },
-        "version": "2.1.0",
+        "version": "2.2.0",
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ")
     }
 
@@ -214,6 +231,21 @@ def analyze_redness_endpoint(req: RednessRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"ViT Redness analysis error: {str(e)}")
 
+@app.post("/api/analyze/pigmentation")
+def analyze_pigmentation_endpoint(req: PigmentationRequest):
+    try:
+        variant = req.variant.lower() if req.variant in ["b0", "b3"] else "b0"
+        detector = get_pigmentation_detector(variant=variant)
+        if not req.image and not req.crops:
+            raise HTTPException(status_code=400, detail="Image or zone crops payload required.")
+        img_payload = req.image or (req.crops.get("leftCheek") if req.crops else None)
+        result = detector.analyze_face(img_payload, landmarks=req.landmarks)
+        if req.pigmentationScore is not None and "pigmentationScore" in result:
+            result["pigmentationScore"] = int(round((result["pigmentationScore"] + float(req.pigmentationScore)) / 2))
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pigmentation analysis error: {str(e)}")
+
 @app.post("/api/analyze/full-skin")
 def analyze_full_skin(req: FullSkinRequest):
     try:
@@ -223,6 +255,8 @@ def analyze_full_skin(req: FullSkinRequest):
         dark_circle_res = analyze_dark_circles(req.image, landmarks=req.landmarks)
         redness_det = get_redness_detector()
         redness_res = redness_det.analyze_face(req.image, landmarks=req.landmarks)
+        pigment_det = get_pigmentation_detector(variant=variant)
+        pigment_res = pigment_det.analyze_face(req.image, landmarks=req.landmarks)
 
         return {
             "success": True,
@@ -230,7 +264,8 @@ def analyze_full_skin(req: FullSkinRequest):
                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "acne": acne_res,
                 "darkCircles": dark_circle_res,
-                "redness": redness_res
+                "redness": redness_res,
+                "pigmentation": pigment_res
             }
         }
     except Exception as e:

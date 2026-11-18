@@ -46,8 +46,13 @@ export function buildReportData({
   let poreScore = 35;
   let poreLabel = "Medium";
 
+  let pigmentationScore = 26;
+  let pigmentationLabel = "Low";
+  let pigmentationPattern = "Uniform tone";
+  let pigmentationArea = 6;
+
   let skinType = "Combination / Sensitive";
-  let primaryConcern = "Mild under-eye dark circles and localized cheek redness";
+  let primaryConcern = "Mild under-eye dark circles, localized cheek redness and even pigmentation";
 
   // Simple, easy-to-follow daily routine
   let amRoutine = [
@@ -88,11 +93,18 @@ export function buildReportData({
       poreLabel = analysisResult.acne.poreSeverity?.label || (poreScore < 35 ? "Minimal" : poreScore <= 68 ? "Medium" : "Enlarged");
     }
 
-    primaryConcern = `${darkCirclesLabel} under-eye circles, ${rednessLabel.toLowerCase()} redness & ${acneLabel.toLowerCase()} acne`;
+    if (analysisResult.pigmentation) {
+      pigmentationScore = Number(analysisResult.pigmentation.pigmentationScore ?? analysisResult.pigmentation.pigmentation_score ?? 26);
+      pigmentationLabel = analysisResult.pigmentation.severityCategory || analysisResult.pigmentation.severity?.label || (pigmentationScore < 34 ? "Low" : pigmentationScore <= 66 ? "Moderate" : "High");
+      pigmentationArea = Number(analysisResult.pigmentation.affectedAreaPercentage ?? 6);
+      pigmentationPattern = analysisResult.pigmentation.detectedPatterns?.[0]?.label || "Uniform tone";
+    }
+
+    primaryConcern = `${darkCirclesLabel} dark circles, ${rednessLabel.toLowerCase()} redness, ${acneLabel.toLowerCase()} acne & ${pigmentationLabel.toLowerCase()} pigmentation`;
   }
 
   // If using AcneAnalysis result:
-  if (analysisResult?.acneScore !== undefined) {
+  if (analysisResult?.acneScore !== undefined && !analysisResult?.pigmentation) {
     scanType = "Acne, Blemishes & Pore Assessment";
     acneScore = analysisResult.acneScore;
     acneLabel = analysisResult.acneSeverity?.label || (acneScore < 30 ? "Low" : acneScore < 60 ? "Moderate" : "Active");
@@ -111,7 +123,7 @@ export function buildReportData({
   }
 
   // Overall Skin Health Score calculation (0-100, where higher is healthier)
-  const compositePenalty = Math.round((darkCirclesScore * 0.35) + (rednessScore * 0.35) + (acneScore * 0.30));
+  const compositePenalty = Math.round((darkCirclesScore * 0.28) + (rednessScore * 0.26) + (acneScore * 0.24) + (pigmentationScore * 0.22));
   const skinHealthScore = Math.max(35, Math.min(98, 100 - Math.round(compositePenalty * 0.65)));
 
   let skinHealthGrade = "Optimal Condition";
@@ -156,6 +168,14 @@ export function buildReportData({
       poreLabel,
       summary: `${acneLabel} acne index (${acneScore}%) • Pore level: ${poreScore}%`,
       tip: "Use gentle salicylic acid cleanser; keep hydration balanced without heavy pore-clogging oils.",
+    },
+    pigmentation: {
+      score: pigmentationScore,
+      label: pigmentationLabel,
+      pattern: pigmentationPattern,
+      affectedArea: pigmentationArea,
+      summary: `${pigmentationLabel} pigmentation (${pigmentationScore}/100) • ${pigmentationPattern}`,
+      tip: "Apply Vitamin C and Niacinamide daily; use Broad-Spectrum SPF 50+ to shield against UV melanogenesis.",
     },
     amRoutine,
     pmRoutine,
@@ -409,16 +429,16 @@ export function generateClinicalPDF(data) {
   curY += heroHeight + 5;
 
   // ═════════════════════════════════════════════════════════════════════════════
-  // 4. THREE CORE SKIN METRICS (SIMPLE & VISUAL)
+  // 4. FOUR CORE SKIN METRICS (SIMPLE & VISUAL)
   // ═════════════════════════════════════════════════════════════════════════════
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(...textDark);
-  doc.text("KEY SKIN CONCERNS & ANALYSIS", margin, curY);
+  doc.text("KEY SKIN CONCERNS & CLINICAL TELEMETRY", margin, curY);
 
   curY += 3;
 
-  const metricBoxWidth = (contentWidth - 6) / 3;
+  const metricBoxWidth = (contentWidth - 9) / 4;
   const metricBoxHeight = 30;
 
   // Box 1: Under-Eye Dark Circles
@@ -428,22 +448,22 @@ export function generateClinicalPDF(data) {
 
   doc.setTextColor(...textDark);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.text("UNDER-EYE CIRCLES", margin + 3.5, curY + 5.5);
+  doc.setFontSize(6.8);
+  doc.text("UNDER-EYE CIRCLES", margin + 2.5, curY + 5.5);
 
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setTextColor(...getBadgeColor(data.darkCircles.score));
-  doc.text(`${data.darkCircles.score}/100`, margin + 3.5, curY + 13);
+  doc.text(`${data.darkCircles.score}/100`, margin + 2.5, curY + 13);
 
-  doc.setFontSize(6.5);
+  doc.setFontSize(6);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...textDark);
-  doc.text(`Severity: ${data.darkCircles.label}`, margin + 3.5, curY + 18);
+  doc.text(`Severity: ${data.darkCircles.label}`, margin + 2.5, curY + 18);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6);
+  doc.setFontSize(5.5);
   doc.setTextColor(...textMuted);
-  doc.text(data.darkCircles.tip, margin + 3.5, curY + 22.5, { maxWidth: metricBoxWidth - 6 });
+  doc.text(data.darkCircles.tip, margin + 2.5, curY + 22.5, { maxWidth: metricBoxWidth - 4 });
 
   // Box 2: Redness & Flushing
   const box2X = margin + metricBoxWidth + 3;
@@ -452,22 +472,22 @@ export function generateClinicalPDF(data) {
 
   doc.setTextColor(...textDark);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.text("REDNESS & ERYTHEMA", box2X + 3.5, curY + 5.5);
+  doc.setFontSize(6.8);
+  doc.text("REDNESS & ERYTHEMA", box2X + 2.5, curY + 5.5);
 
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setTextColor(...getBadgeColor(data.redness.score));
-  doc.text(`${data.redness.score}/100`, box2X + 3.5, curY + 13);
+  doc.text(`${data.redness.score}/100`, box2X + 2.5, curY + 13);
 
-  doc.setFontSize(6.5);
+  doc.setFontSize(6);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...textDark);
-  doc.text(`Severity: ${data.redness.label}`, box2X + 3.5, curY + 18);
+  doc.text(`Severity: ${data.redness.label}`, box2X + 2.5, curY + 18);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6);
+  doc.setFontSize(5.5);
   doc.setTextColor(...textMuted);
-  doc.text(data.redness.tip, box2X + 3.5, curY + 22.5, { maxWidth: metricBoxWidth - 6 });
+  doc.text(data.redness.tip, box2X + 2.5, curY + 22.5, { maxWidth: metricBoxWidth - 4 });
 
   // Box 3: Acne & Skin Clarity
   const box3X = box2X + metricBoxWidth + 3;
@@ -476,22 +496,50 @@ export function generateClinicalPDF(data) {
 
   doc.setTextColor(...textDark);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.text("ACNE & PORE CLARITY", box3X + 3.5, curY + 5.5);
+  doc.setFontSize(6.8);
+  doc.text("ACNE & PORES", box3X + 2.5, curY + 5.5);
 
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setTextColor(...getBadgeColor(data.acnePores.acneScore));
-  doc.text(`${data.acnePores.acneScore}%`, box3X + 3.5, curY + 13);
+  doc.text(`${data.acnePores.acneScore}%`, box3X + 2.5, curY + 13);
 
-  doc.setFontSize(6.5);
+  doc.setFontSize(6);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...textDark);
-  doc.text(`Acne: ${data.acnePores.acneLabel} • Pores: ${data.acnePores.poreLabel}`, box3X + 3.5, curY + 18);
+  doc.text(`Acne: ${data.acnePores.acneLabel}`, box3X + 2.5, curY + 18);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6);
+  doc.setFontSize(5.5);
   doc.setTextColor(...textMuted);
-  doc.text(data.acnePores.tip, box3X + 3.5, curY + 22.5, { maxWidth: metricBoxWidth - 6 });
+  doc.text(data.acnePores.tip, box3X + 2.5, curY + 22.5, { maxWidth: metricBoxWidth - 4 });
+
+  // Box 4: Pigmentation & Tone
+  const box4X = box3X + metricBoxWidth + 3;
+  doc.setFillColor(...softBg);
+  doc.roundedRect(box4X, curY, metricBoxWidth, metricBoxHeight, 2, 2, "FD");
+
+  doc.setTextColor(...textDark);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.8);
+  doc.text("PIGMENTATION & TONE", box4X + 2.5, curY + 5.5);
+
+  const pigScore = data.pigmentation?.score ?? 26;
+  const pigLabel = data.pigmentation?.label ?? "Low";
+  const pigTip = data.pigmentation?.tip ?? "Apply daily Vitamin C, Niacinamide & SPF 50+ to inhibit UV melanogenesis.";
+
+  doc.setFontSize(13);
+  doc.setTextColor(...getBadgeColor(pigScore));
+  doc.text(`${pigScore}/100`, box4X + 2.5, curY + 13);
+
+  doc.setFontSize(6);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...textDark);
+  doc.text(`Severity: ${pigLabel}`, box4X + 2.5, curY + 18);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5.5);
+  doc.setTextColor(...textMuted);
+  doc.text(pigTip, box4X + 2.5, curY + 22.5, { maxWidth: metricBoxWidth - 4 });
 
   curY += metricBoxHeight + 5;
 

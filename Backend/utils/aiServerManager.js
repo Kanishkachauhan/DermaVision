@@ -13,7 +13,7 @@ let isStarting = false;
 
 export async function checkAIServerHealth() {
   try {
-    const res = await axios.get(`${AI_URL}/api/health`, { timeout: 2000 });
+    const res = await axios.get(`${AI_URL}/api/health`, { timeout: 800 });
     return res.data?.status === 'online';
   } catch {
     return false;
@@ -28,12 +28,11 @@ export async function ensureAIServerRunning() {
   }
 
   if (isStarting) {
-    console.log('[AI Manager] Python AI microservice startup already in progress...');
     return false;
   }
 
   isStarting = true;
-  console.log('[AI Manager] Python AI microservice is offline. Auto-starting...');
+  console.log('[AI Manager] Python AI microservice is offline. Attempting background start...');
 
   const serviceDir = path.resolve(__dirname, '../../Model/05_api_service');
   const serverScript = path.join(serviceDir, 'server.py');
@@ -47,22 +46,22 @@ export async function ensureAIServerRunning() {
       env: { ...process.env, PYTHONUNBUFFERED: '1' },
     });
 
+    child.on('error', (err) => {
+      console.warn('[AI Manager] Background Python process note:', err.message);
+      isStarting = false;
+    });
+
     child.unref();
     console.log(`[AI Manager] Spawned Python AI process (PID: ${child.pid}) using ${pyCmd}`);
 
-    for (let i = 0; i < 8; i++) {
-      await new Promise((r) => setTimeout(r, 1000));
-      const up = await checkAIServerHealth();
-      if (up) {
-        console.log('[AI Manager] Python AI microservice is now online on port 8000!');
-        isStarting = false;
-        return true;
-      }
-    }
+    // Quick single-second check so we don't stall HTTP requests
+    await new Promise((r) => setTimeout(r, 1000));
+    const up = await checkAIServerHealth();
+    isStarting = false;
+    return up;
   } catch (err) {
-    console.error('[AI Manager] Failed to auto-start Python AI microservice:', err.message);
+    console.warn('[AI Manager] Python AI microservice start bypassed:', err.message);
+    isStarting = false;
+    return false;
   }
-
-  isStarting = false;
-  return false;
 }

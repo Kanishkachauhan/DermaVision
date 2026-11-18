@@ -239,7 +239,7 @@ const ReportModal = ({ isOpen, onClose, reportData }) => {
                 <span className="text-[11px] text-[#7A7069]">Visual AI analysis summary</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* 1. Under-Eye Dark Circles */}
                 <div className="p-4 rounded-xl bg-[#FAF8F5] border border-[#E8DFD8] flex flex-col justify-between space-y-2">
                   <div className="flex items-center justify-between">
@@ -299,6 +299,29 @@ const ReportModal = ({ isOpen, onClose, reportData }) => {
                     </div>
                     <p className="text-[11px] text-[#5A524C] mt-1 leading-snug">
                       {reportData.acnePores.tip}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 4. Pigmentation & Tone */}
+                <div className="p-4 rounded-xl bg-[#FAF8F5] border border-[#E8DFD8] flex flex-col justify-between space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#7A7069] flex items-center gap-1.5">
+                      <span>☀️</span> Pigmentation &amp; Tone
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                      {reportData.pigmentation?.label || "Low"}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-black text-[#2B2623]">
+                        {reportData.pigmentation?.score ?? 26}
+                      </span>
+                      <span className="text-xs text-[#7A7069]">/ 100</span>
+                    </div>
+                    <p className="text-[11px] text-[#5A524C] mt-1 leading-snug">
+                      {reportData.pigmentation?.tip || "Apply daily Vitamin C, Niacinamide & SPF 50+ to inhibit UV melanogenesis."}
                     </p>
                   </div>
                 </div>
